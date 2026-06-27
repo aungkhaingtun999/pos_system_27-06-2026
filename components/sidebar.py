@@ -18,7 +18,11 @@ from auth import logout, change_password
 from language import get_text
 # အရေးကြီး: sys.path ထဲတွင် root_dir ရှိနေပြီဖြစ်သောကြောင့် 
 # 'components.supabase_logic' ဟု ခေါ်နိုင်ပါပြီ
-from components.supabase_logic import sync_to_supabase
+# အဟောင်း (Error ဖြစ်နေတာ)
+# from components.supabase_logic import sync_to_supabase
+
+# အသစ် (ဤသို့ပြင်ပါ)
+from .supabase_logic import sync_to_supabase
 
 # ==========================================
 # IMPORTS
