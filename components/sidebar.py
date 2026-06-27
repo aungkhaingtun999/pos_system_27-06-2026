@@ -3,14 +3,14 @@ import socket
 import sys
 import os
 
-# ဖိုင်တည်နေရာကို Python Path ထဲသို့ အတင်းထည့်ပေးခြင်း (Fix)
+# ဖိုင်လမ်းကြောင်းကို Root သို့ ပြန်ညွှန်းခြင်း (Fix for ModuleNotFoundError)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from auth import logout, change_password
 from language import get_text
 
 # ==========================================
-# 2. Helper Functions (Connection & Navigation)
+# Helper Functions
 # ==========================================
 def _check_internet():
     try:
@@ -25,11 +25,11 @@ def _handle_menu_change(selected_menu):
     st.rerun()
 
 # ==========================================
-# 3. Main Run Module (Sidebar UI)
+# Main Sidebar UI
 # ==========================================
 def show_sidebar():
     with st.sidebar:
-        # 1. Status Section (Internet & Language)
+        # 1. Status Section
         col1, col2 = st.columns([1, 1])
         with col1:
             if _check_internet():
@@ -46,12 +46,12 @@ def show_sidebar():
         
         st.markdown("---")
         
-        # 2. User Profile (Banner များကို ဖယ်ရှားပြီး သန့်ရှင်းစွာပြသခြင်း)
+        # 2. User Info
         username = st.session_state.get('username', 'User')
         role = st.session_state.get("user_role", "Cashier")
         st.info(f"👤 **{username}**\n\n🛡️ Role: *{role}*")
         
-        # 3. Quick Action (Sync Data)
+        # 3. Sync Data
         if st.button("🔄 Sync Data Now", key="sync_btn", use_container_width=True):
             if _check_internet():
                 from components.supabase_logic import sync_to_supabase
@@ -63,7 +63,7 @@ def show_sidebar():
         
         st.markdown("---")
         
-        # 4. Role-Based Menu Logic
+        # 4. Role-Based Menu
         menu_items = ["POS System"]
         if role in ["Admin", "Inventory Manager"]:
             menu_items.append("Inventory")
@@ -76,12 +76,10 @@ def show_sidebar():
             current_menu = "POS System"
             st.session_state.menu = "POS System"
         
-        menu_index = menu_items.index(current_menu)
-        
         selected_menu = st.radio(
             "📌 Main Menu", 
             menu_items, 
-            index=menu_index,
+            index=menu_items.index(current_menu),
             key="main_menu_radio"
         )
         
@@ -95,13 +93,11 @@ def show_sidebar():
             st.session_state.show_pwd_change = True
             
         if st.session_state.get("show_pwd_change", False):
-            # Password ပြောင်းခြင်းလုပ်ဆောင်ချက်ကို Box တစ်ခုအတွင်း ထည့်ပေးထားသည်
             with st.container(border=True):
                 change_password()
                 if st.button("❌ Close", key="cls_pwd", use_container_width=True): 
                     st.session_state.show_pwd_change = False
                     st.rerun()
         
-        st.write("") # နေရာအနည်းငယ်ချန်ရန်
         if st.button("🚪 Log Out", key="out_btn", use_container_width=True): 
             logout()
