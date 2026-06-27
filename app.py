@@ -1,4 +1,4 @@
-﻿import sys
+import sys
 import os
 # လက်ရှိ folder ကို path ထဲထည့်ခြင်း
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -16,6 +16,9 @@ from components.refund import show_refund
 from components.receipt_generator import show_receipt 
 from components.supabase_logic import insert_sale_to_supabase
 
+# အကယ်၍ User Management အတွက် သီးခြား file ရှိလျှင် import လုပ်ပါ
+# from components.user_management import show_user_management 
+
 def setup_page():
     st.set_page_config(page_title="Barcode POS System", layout="wide", initial_sidebar_state="expanded")
 
@@ -27,11 +30,14 @@ def auto_sync_on_start():
                 try:
                     insert_sale_to_supabase(sale['cart'], sale['totals'], sale['rec_no'], sale['payment_method'], sale['customer'])
                     st.session_state.pending_sales.remove(sale)
-                except Exception as e:
-                    st.warning("အင်တာနက် အားနည်းနေ၍ Sync မအောင်မြင်ပါ။ နောက်မှ ထပ်ကြိုးစားပါမည်။")
+                except Exception:
+                    st.warning("အင်တာနက် အားနည်းနေ၍ Sync မအောင်မြင်ပါ။")
                     break
 
 def run_router():
+    """Role-based Navigation Router"""
+    role = st.session_state.get("user_role", "Cashier")
+    
     menu_map = {
         "POS System": show_pos_system,
         "Inventory": show_inventory,
@@ -39,8 +45,19 @@ def run_router():
         "Profit & Loss": show_profit_loss, 
         "Refund": show_refund,
     }
+    
+    # Admin အတွက်သာ ခွင့်ပြုထားသော Menu များ
+    if role == "Admin":
+        # menu_map["User Management"] = show_user_management
+        pass
+
     current_menu = st.session_state.get("menu", "POS System")
-    menu_map.get(current_menu, show_pos_system)()
+    
+    # ရွေးချယ်ထားသော Menu ကို ခေါ်ပြခြင်း
+    if current_menu in menu_map:
+        menu_map[current_menu]()
+    else:
+        show_pos_system()
 
 def main():
     setup_page()
@@ -48,13 +65,17 @@ def main():
     init_app_state()
     init_session()
 
+    # Login စစ်ဆေးခြင်း
     if not check_password(): 
         st.stop()
         
     # App စဖွင့်ချိန် Auto Sync လုပ်ခြင်း
     auto_sync_on_start()
     
+    # Sidebar ပြသခြင်း
     show_sidebar()
+    
+    # Main Content Route
     run_router()
 
     # --- Receipt Logic ---
@@ -67,7 +88,7 @@ def main():
             customer=st.session_state.get("current_customer", "Walk-in")
         )
         
-        # Receipt ပြပြီးလျှင် Session ကို ပြန်လည်ရှင်းလင်းခြင်း (အရေးကြီး)
+        # Receipt ပြပြီးလျှင် Session ကို ပြန်လည်ရှင်းလင်းခြင်း
         if st.button("Close Receipt"):
             st.session_state.receipt = None
             st.session_state.receipt_totals = None
