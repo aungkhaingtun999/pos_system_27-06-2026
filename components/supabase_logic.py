@@ -1,4 +1,4 @@
-﻿import streamlit as st
+import streamlit as st
 import json
 from supabase import create_client
 from datetime import datetime
@@ -8,12 +8,9 @@ from datetime import datetime
 # ==========================================
 @st.cache_resource
 def _get_client():
-    # GitHub တွင် Key များ တိုက်ရိုက်မထည့်ဘဲ Streamlit Secrets ကို အသုံးပြုပါ
     url = st.secrets.get("SUPABASE_URL")
     key = st.secrets.get("SUPABASE_KEY")
-    
     if not url or not key:
-        st.error("Database Configuration မရှိပါ။ Secrets ထည့်ပေးပါ။")
         return None
     return create_client(url, key)
 
@@ -25,14 +22,14 @@ def _clear_cache():
 # ==========================================
 # 2. Product & Stock Management
 # ==========================================
-@st.cache_data(ttl=600) # 10 မိနစ်တိုင်း cache ပြန်ဆန်းခြင်း
+@st.cache_data(ttl=600)
 def get_products_cached():
     if not supabase: return []
     try:
         response = supabase.table("products").select("*").execute()
         return response.data if response.data else []
     except Exception as e:
-        print(f"Error fetching products: {e}") 
+        st.error(f"Error fetching products: {e}")
         return []
 
 def find_by_barcode(barcode):
@@ -41,13 +38,15 @@ def find_by_barcode(barcode):
 
 def update_product_stock(barcode, new_stock):
     try:
+        # Stock အသစ်ကို update လုပ်ခြင်း
         supabase.table("products").update({"stock_qty": int(new_stock)}).eq("barcode", barcode).execute()
         _clear_cache()
     except Exception as e:
-        st.error(f"Error updating stock for {barcode}: {e}")
+        st.error(f"Stock Update Error: {e}")
         raise e
 
 def process_sale_stock_update(cart):
+    """Sale ပြီးတိုင်း Stock အလိုအလျောက်လျှော့ရန်"""
     for item in cart:
         barcode = str(item.get("barcode"))
         product = find_by_barcode(barcode)
@@ -56,6 +55,7 @@ def process_sale_stock_update(cart):
             update_product_stock(barcode, new_stock)
 
 def reverse_stock_update(barcode, qty_to_add):
+    """Refund လုပ်သည့်အခါ Stock ပြန်တိုးရန်"""
     product = find_by_barcode(barcode)
     if product:
         new_stock = int(product.get("stock_qty", 0)) + int(qty_to_add)
@@ -81,27 +81,39 @@ def insert_sale_to_supabase(cart, totals, receipt_no, payment_method, customer_n
 
 def execute_refund(inv, items_to_refund):
     total_refunded = 0
-    for item in items_to_refund:
-        barcode = str(item.get('barcode'))
-        qty = int(item.get('qty', 0))
-        reverse_stock_update(barcode, qty)
+    try:
+        for item in items_to_refund:
+            barcode = str(item.get('barcode'))
+            qty = int(item.get('qty', 0))
+            reverse_stock_update(barcode, qty)
+            
+            price = float(item.get('sell_price') or item.get('price') or 0)
+            total_refunded += (price * qty)
         
-        price = float(item.get('sell_price') or item.get('price') or 0)
-        total_refunded += (price * qty)
-    
-    refund_data = {
-        "receipt_no": inv.get('receipt_no'),
-        "items": json.dumps(items_to_refund, ensure_ascii=False),
-        "refund_amount": float(total_refunded),
-        "refunded_at": datetime.now().isoformat()
-    }
-    supabase.table("refunds").insert(refund_data).execute()
-    
-    # Log ရေးမှတ်ခြင်းကို ခေါ်သုံးခြင်း
-    log_refund(inv.get('receipt_no'), items_to_refund, total_refunded)
-    return total_refunded
+        refund_data = {
+            "receipt_no": inv.get('receipt_no'),
+            "items": json.dumps(items_to_refund, ensure_ascii=False),
+            "refund_amount": float(total_refunded),
+            "refunded_at": datetime.now().isoformat()
+        }
+        supabase.table("refunds").insert(refund_data).execute()
+        
+        # Log ရေးမှတ်ခြင်း
+        log_refund(inv.get('receipt_no'), items_to_refund, total_refunded)
+        return total_refunded
+    except Exception as e:
+        st.error(f"Refund Process Error: {e}")
+        return 0
 
 def log_refund(receipt_no, items, total_refunded):
-    """Refund Log ကို Console နှင့် Database တွင် မှတ်တမ်းတင်ခြင်း"""
-    print(f"Refund processed for Receipt: {receipt_no}, Amount: {total_refunded}")
-    # လိုအပ်ပါက ဒီနေရာမှာလည်း Database တစ်ခုခုကို ထပ်မှတ်နိုင်ပါတယ်
+    """Refund Log ကို Database တွင် တိုက်ရိုက်မှတ်တမ်းတင်ခြင်း"""
+    try:
+        log_data = {
+            "receipt_no": receipt_no,
+            "details": f"Refunded {len(items)} items",
+            "amount": float(total_refunded),
+            "timestamp": datetime.now().isoformat()
+        }
+        supabase.table("refund_logs").insert(log_data).execute()
+    except Exception as e:
+        print(f"Logging Error: {e}")
