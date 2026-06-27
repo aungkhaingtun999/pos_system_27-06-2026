@@ -1,63 +1,46 @@
-﻿# ==========================================
-# 1. Imports
-# ==========================================
 import streamlit as st
 import re
-# auth.py ၏ အပေါ်ဆုံး Import အပိုင်းကို အောက်ပါအတိုင်း ပြင်ပါ:
-from database import get_all_users, update_password_db, reset_password as db_reset_password
+from database import get_user_from_db, update_password_db, reset_password as db_reset_password
 
 # ==========================================
-# 2. Helper Functions (Logic & Validation)
+# 1. Initialization
 # ==========================================
 def init_auth_state():
-    """Initializes session state for authentication."""
-    if "users" not in st.session_state:
-        st.session_state.users = get_all_users()
-    
+    """Session state များကို Initialize လုပ်ခြင်း"""
     if "logged_in" not in st.session_state:
         st.session_state.logged_in = False
-        
     if "username" not in st.session_state:
         st.session_state.username = None
+    if "user_role" not in st.session_state:
+        st.session_state.user_role = None
 
+# ==========================================
+# 2. Helper Functions
+# ==========================================
 def is_strong(password):
-    """Validates if the password meets security requirements."""
+    """Password လုံခြုံရေး စစ်ဆေးခြင်း"""
     if len(password) < 8: return False
     if not re.search("[a-z]", password) or not re.search("[A-Z]", password): return False
     if not re.search("[0-9]", password) or not re.search("[!@#$%^&*]", password): return False
     return True
 
 def logout():
-    """Clears session state and resets the application state."""
+    """Logout လုပ်ပြီး Session ရှင်းလင်းခြင်း"""
     st.session_state.logged_in = False
     st.session_state.username = None
+    st.session_state.user_role = None
     
-    keys_to_clear = ["cart", "receipt", "show_pwd_change", "receipt_totals", "receipt_no"]
+    keys_to_clear = ["cart", "receipt", "show_pwd_change", "receipt_totals", "receipt_no", "menu"]
     for key in keys_to_clear:
         if key in st.session_state:
             del st.session_state[key]
     st.rerun()
 
-def perform_password_update(user, old, new, confirm):
-    """Handles the business logic of updating a password."""
-    current_users = get_all_users()
-    
-    if current_users.get(user) != old:
-        return False, "❌ Password အဟောင်း မှားနေပါသည်။"
-    if not is_strong(new):
-        return False, "⚠️ Password သည် ၈ လုံးအထက်၊ စာလုံးအကြီး၊ အသေး၊ ဂဏန်းနှင့် သင်္ကေတများ ပါဝင်ရမည်။"
-    if new != confirm:
-        return False, "❌ Password အသစ် မတူပါ။"
-    
-    update_password_db(user, new)
-    st.session_state.users[user] = new
-    return True, "✅ အောင်မြင်ပါသည်။"
-
 # ==========================================
-# 3. UI Components (Run Modules)
+# 3. Main Auth Logic (Login & Password Update)
 # ==========================================
 def check_password():
-    """UI component for login screen."""
+    """Login UI လုပ်ဆောင်ချက်"""
     init_auth_state()
     
     if not st.session_state.logged_in:
@@ -66,24 +49,42 @@ def check_password():
         password = st.text_input("Password", type="password", key="login_pass")
         
         if st.button("Log In"):
-            users = get_all_users()
-            if username in users and users[username] == password:
+            # Supabase ထဲက User အချက်အလက်ကို ဆွဲထုတ်ခြင်း
+            user_data = get_user_from_db(username, password)
+            
+            if user_data:
                 st.session_state.logged_in = True
                 st.session_state.username = username
+                st.session_state.user_role = user_data.get("role", "Cashier") # Role ကိုသိမ်းခြင်း
                 st.rerun()
             else: 
                 st.error("❌ Username သို့မဟုတ် Password မှားယွင်းနေပါသည်။")
         return False
     return True
 
+def perform_password_update(username, old, new, confirm):
+    """Password အဟောင်း/အသစ် စစ်ဆေးပြီး Database ထဲသို့ Update လုပ်ခြင်း"""
+    # 1. Validation စစ်ဆေးခြင်း
+    if not is_strong(new):
+        return False, "⚠️ Password သည် ၈ လုံးအထက်၊ စာလုံးအကြီး၊ အသေး၊ ဂဏန်းနှင့် သင်္ကေတများ ပါဝင်ရမည်။"
+    if new != confirm:
+        return False, "❌ Password အသစ် မတူပါ။"
+    
+    # 2. Database တွင် Update လုပ်ခြင်း
+    success = update_password_db(username, old, new)
+    if success:
+        return True, "✅ Password အောင်မြင်စွာ ပြောင်းလဲပြီးပါပြီ။"
+    else:
+        return False, "❌ Password အဟောင်း မှားနေပါသည် (သို့မဟုတ်) Database Error တက်နေပါသည်။"
+
 def change_password():
-    """UI component for password change form."""
+    """Password ပြောင်းလဲခြင်း UI"""
     st.subheader("🔑 Password ပြောင်းလဲခြင်း")
     user = st.session_state.get("username")
     
     old = st.text_input("Old Password", type="password", key="old_pwd")
     new = st.text_input("New Password", type="password", key="new_pwd")
-    confirm = st.text_input("Confirm New Password", key="conf_pwd")
+    confirm = st.text_input("Confirm New Password", type="password", key="conf_pwd")
     
     if st.button("Update Password"):
         success, message = perform_password_update(user, old, new, confirm)
@@ -93,9 +94,8 @@ def change_password():
             st.error(message)
 
 def reset_password(username):
-    """Executes password reset and updates state."""
-    if db_reset_password(username):
-        init_auth_state()
-        st.session_state.users[username] = "123"
-        return True
+    """Admin အနေဖြင့် User တစ်ဦး၏ Password ကို Reset လုပ်ခြင်း"""
+    if st.session_state.user_role == "Admin":
+        if db_reset_password(username):
+            return True
     return False
