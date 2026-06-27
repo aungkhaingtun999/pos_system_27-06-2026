@@ -7,7 +7,6 @@ from language import get_text
 # 2. Helper Functions (Connection & Navigation)
 # ==========================================
 def _check_internet():
-    """အင်တာနက် ချိတ်ဆက်မှု ရှိမရှိ စစ်ဆေးခြင်း"""
     try:
         socket.create_connection(("8.8.8.8", 53), timeout=2)
         return True
@@ -15,9 +14,8 @@ def _check_internet():
         return False
 
 def _handle_menu_change(selected_menu):
-    """Menu ပြောင်းလဲမှုကို စီမံခန့်ခွဲခြင်း"""
     st.session_state.menu = selected_menu
-    # st.query_params သည် Streamlit version အသစ်များအတွက်သုံးပါ
+    # Query Params သုံးခြင်းဖြင့် URL အလိုက် ပြောင်းလဲစေရန်
     st.query_params["menu"] = selected_menu
     st.rerun()
 
@@ -25,7 +23,6 @@ def _handle_menu_change(selected_menu):
 # 3. Main Run Module (Sidebar UI)
 # ==========================================
 def show_sidebar():
-    """Sidebar UI ကို Render လုပ်ပေးသော Main module"""
     with st.sidebar:
         # Internet Status
         if _check_internet():
@@ -50,7 +47,7 @@ def show_sidebar():
         # Sync Data
         if st.button("🔄 Sync Data Now", key="sync_btn", use_container_width=True):
             if _check_internet():
-                from components.supabase_logic import sync_to_supabase # Path မှန်အောင်ပြင်ထားပါ
+                from components.supabase_logic import sync_to_supabase
                 with st.spinner("Syncing..."):
                     sync_to_supabase()
                 st.success("✅ Success")
@@ -60,30 +57,33 @@ def show_sidebar():
         st.markdown("---")
         
         # --- Role-Based Menu Logic ---
+        # Menu စာရင်းကို အမြဲတမ်း Refresh ဖြစ်အောင် လုပ်ဆောင်ပါ
         menu_items = ["POS System"]
         
-        # Admin သို့မဟုတ် Inventory Manager ဖြစ်မှသာ Inventory မြင်ရမည်
         if role in ["Admin", "Inventory Manager"]:
             menu_items.append("Inventory")
             
-        # Admin သာလျှင် Reports နှင့် Profit & Loss ကို မြင်ရမည်
         if role == "Admin":
-            menu_items.extend(["Reports", "Profit & Loss", "User Management"]) # User Management ထည့်ထားသည်
+            menu_items.extend(["Reports", "Profit & Loss", "User Management"])
             
         menu_items.append("Refund")
         
-        # လက်ရှိ menu ကို သတ်မှတ်ခြင်း
+        # လက်ရှိ menu ကို Session မှရယူပါ (default POS System)
         current_menu = st.session_state.get("menu", "POS System")
         
-        # မရှိတော့တဲ့ Menu တစ်ခုခုမှာ ရောက်နေရင် POS သို့ပြန်ပို့ပေးခြင်း
+        # အကယ်၍ current_menu က menu_items ထဲမှာ မရှိတော့ရင် (ဥပမာ Role ပြောင်းသွားရင်)
         if current_menu not in menu_items:
             current_menu = "POS System"
             st.session_state.menu = "POS System"
         
+        # Radio button index ကို error မတက်အောင် လုံခြုံစွာရယူပါ
+        menu_index = menu_items.index(current_menu)
+        
         selected_menu = st.radio(
             "📌 Main Menu", 
             menu_items, 
-            index=menu_items.index(current_menu)
+            index=menu_index,
+            key="main_menu_radio"
         )
         
         if selected_menu != current_menu:
