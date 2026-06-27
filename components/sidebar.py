@@ -1,8 +1,20 @@
 import streamlit as st
 import socket
-# အောက်ပါအတိုင်း ပြင်ပါ (Root ကနေ တိုက်ရိုက် Import လုပ်ခြင်း)
-from auth import logout, change_password
-from language import get_text
+import sys
+import os
+
+# Root directory ကို သေချာပေါက် path ထဲထည့်ပေးခြင်း
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+# ဤနည်းလမ်းဖြင့် import လုပ်ပါ
+try:
+    from auth import logout, change_password
+    from language import get_text
+except ImportError:
+    # အကယ်၍ အပေါ်နည်းလမ်းမရပါက ဤနေရာတွင် စမ်းသပ်ပါ
+    sys.path.append(os.getcwd())
+    from auth import logout, change_password
+    from language import get_text
 # ==========================================
 # Helper Functions
 # ==========================================
