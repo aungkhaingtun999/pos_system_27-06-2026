@@ -1,6 +1,19 @@
 import streamlit as st
 import re
-from database import get_user_from_db, update_password_db, reset_password as db_reset_password
+import sys
+import os
+
+# --- Path Configuration (Database ကိုသေချာရှာနိုင်ရန်) ---
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+# Database Import (Error မတက်စေရန် Try-Except သုံးထားသည်)
+try:
+    from database import get_user_from_db, update_password_db, reset_password as db_reset_password
+except ImportError:
+    try:
+        from components.database import get_user_from_db, update_password_db, reset_password as db_reset_password
+    except ImportError:
+        st.error("❌ Database module ကို ရှာမတွေ့ပါ။ ဖိုင်တည်နေရာကို စစ်ဆေးပါ။")
 
 # ==========================================
 # 1. Initialization
@@ -30,6 +43,7 @@ def logout():
     st.session_state.username = None
     st.session_state.user_role = None
     
+    # ဆက်စပ်နေသော Session keys များရှင်းလင်းခြင်း
     keys_to_clear = ["cart", "receipt", "show_pwd_change", "receipt_totals", "receipt_no", "menu"]
     for key in keys_to_clear:
         if key in st.session_state:
@@ -37,7 +51,7 @@ def logout():
     st.rerun()
 
 # ==========================================
-# 3. Main Auth Logic (Login & Password Update)
+# 3. Main Auth Logic
 # ==========================================
 def check_password():
     """Login UI လုပ်ဆောင်ချက်"""
@@ -49,13 +63,13 @@ def check_password():
         password = st.text_input("Password", type="password", key="login_pass")
         
         if st.button("Log In"):
-            # Supabase ထဲက User အချက်အလက်ကို ဆွဲထုတ်ခြင်း
+            # Database မှ User data ကို ဆွဲထုတ်ခြင်း (Database.py ထဲတွင် get_user_from_db ရေးထားရန် လိုသည်)
             user_data = get_user_from_db(username, password)
             
             if user_data:
                 st.session_state.logged_in = True
-                st.session_state.username = username
-                st.session_state.user_role = user_data.get("role", "Cashier") # Role ကိုသိမ်းခြင်း
+                st.session_state.username = user_data["username"]
+                st.session_state.user_role = user_data.get("role", "Cashier")
                 st.rerun()
             else: 
                 st.error("❌ Username သို့မဟုတ် Password မှားယွင်းနေပါသည်။")
@@ -63,19 +77,17 @@ def check_password():
     return True
 
 def perform_password_update(username, old, new, confirm):
-    """Password အဟောင်း/အသစ် စစ်ဆေးပြီး Database ထဲသို့ Update လုပ်ခြင်း"""
-    # 1. Validation စစ်ဆေးခြင်း
+    """Password ပြောင်းလဲခြင်း logic"""
     if not is_strong(new):
         return False, "⚠️ Password သည် ၈ လုံးအထက်၊ စာလုံးအကြီး၊ အသေး၊ ဂဏန်းနှင့် သင်္ကေတများ ပါဝင်ရမည်။"
     if new != confirm:
         return False, "❌ Password အသစ် မတူပါ။"
     
-    # 2. Database တွင် Update လုပ်ခြင်း
-    success = update_password_db(username, old, new)
-    if success:
+    # Database ထဲတွင် update လုပ်ခြင်း
+    if update_password_db(username, old, new):
         return True, "✅ Password အောင်မြင်စွာ ပြောင်းလဲပြီးပါပြီ။"
     else:
-        return False, "❌ Password အဟောင်း မှားနေပါသည် (သို့မဟုတ်) Database Error တက်နေပါသည်။"
+        return False, "❌ Password အဟောင်း မှားနေပါသည်။"
 
 def change_password():
     """Password ပြောင်းလဲခြင်း UI"""
@@ -94,8 +106,7 @@ def change_password():
             st.error(message)
 
 def reset_password(username):
-    """Admin အနေဖြင့် User တစ်ဦး၏ Password ကို Reset လုပ်ခြင်း"""
+    """Admin အနေဖြင့် Password ကို Reset လုပ်ခြင်း"""
     if st.session_state.user_role == "Admin":
-        if db_reset_password(username):
-            return True
+        return db_reset_password(username)
     return False
