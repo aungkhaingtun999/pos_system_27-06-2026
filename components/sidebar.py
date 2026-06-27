@@ -13,7 +13,11 @@ if root_dir not in sys.path:
 # --- Imports ---
 from auth import logout, change_password
 from language import get_text
+# အဟောင်း (Error ဖြစ်စေသောနေရာ)
+# from components.supabase_logic import sync_to_supabase
 
+# အသစ် (ဤသို့ ပြင်ဆင်ပါ)
+from supabase_logic import sync_to_supabase
 # ==========================================
 # Helper Functions
 # ==========================================
