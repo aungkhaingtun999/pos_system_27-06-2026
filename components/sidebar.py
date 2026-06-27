@@ -16,7 +16,7 @@ from auth import logout, change_password
 from language import get_text
 # အရေးကြီး: from .supabase_logic မသုံးပါနှင့်၊ components folder ထဲတွင်ရှိသောကြောင့် 
 # root path ကို fix လုပ်ပြီးပါက တိုက်ရိုက်ခေါ်နိုင်သည်
-from components.supabase_logic import sync_to_supabase 
+from supabase_logic import sync_to_supabase
 
 # ==========================================
 # Helper Functions
