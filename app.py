@@ -2,10 +2,11 @@ import streamlit as st
 import sys
 import os
 
-# Root Directory ကို Python Path ထဲသို့ ထည့်ခြင်း (ဒါမှသာ components များကို အမှားမရှိခေါ်နိုင်မည်)
-root_dir = os.path.dirname(os.path.abspath(__file__))
-if root_dir not in sys.path:
-    sys.path.append(root_dir)
+# Root folder ကို path ထဲကို ထည့်ခြင်း
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+# Imports
+from components.sidebar import show_sidebar
 
 # --- Imports ---
 from auth import check_password, init_auth_state
