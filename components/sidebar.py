@@ -3,18 +3,17 @@ import socket
 import sys
 import os
 
-# Root directory ကို သေချာပေါက် path ထဲထည့်ပေးခြင်း
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Root Directory ကို ရှာဖွေပြီး Path ထဲသို့ ထည့်ခြင်း (အရေးကြီးသည်)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+root_dir = os.path.dirname(current_dir)
+if root_dir not in sys.path:
+    sys.path.append(root_dir)
 
-# ဤနည်းလမ်းဖြင့် import လုပ်ပါ
-try:
-    from auth import logout, change_password
-    from language import get_text
-except ImportError:
-    # အကယ်၍ အပေါ်နည်းလမ်းမရပါက ဤနေရာတွင် စမ်းသပ်ပါ
-    sys.path.append(os.getcwd())
-    from auth import logout, change_password
-    from language import get_text
+# ယခုမှသာ အောက်ပါအတိုင်း import လုပ်ပါ
+from auth import logout, change_password
+from language import get_text
+
+# ... ကျန်ရှိသော code များ ...
 # ==========================================
 # Helper Functions
 # ==========================================
