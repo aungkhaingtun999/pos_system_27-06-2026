@@ -63,7 +63,7 @@ def check_password():
         password = st.text_input("Password", type="password", key="login_pass")
         
         if st.button("Log In"):
-            # Database မှ User data ကို ဆွဲထုတ်ခြင်း (Database.py ထဲတွင် get_user_from_db ရေးထားရန် လိုသည်)
+            # Database မှ User data (role ပါ) ကို ဆွဲထုတ်ခြင်း
             user_data = get_user_from_db(username, password)
             
             if user_data:
@@ -77,13 +77,12 @@ def check_password():
     return True
 
 def perform_password_update(username, old, new, confirm):
-    """Password ပြောင်းလဲခြင်း logic"""
+    """Password အဟောင်း/အသစ် စစ်ဆေးပြီး Database ထဲသို့ Update လုပ်ခြင်း"""
     if not is_strong(new):
         return False, "⚠️ Password သည် ၈ လုံးအထက်၊ စာလုံးအကြီး၊ အသေး၊ ဂဏန်းနှင့် သင်္ကေတများ ပါဝင်ရမည်။"
     if new != confirm:
         return False, "❌ Password အသစ် မတူပါ။"
     
-    # Database ထဲတွင် update လုပ်ခြင်း
     if update_password_db(username, old, new):
         return True, "✅ Password အောင်မြင်စွာ ပြောင်းလဲပြီးပါပြီ။"
     else:
@@ -106,7 +105,7 @@ def change_password():
             st.error(message)
 
 def reset_password(username):
-    """Admin အနေဖြင့် Password ကို Reset လုပ်ခြင်း"""
+    """Admin အနေဖြင့် User တစ်ဦး၏ Password ကို Reset လုပ်ခြင်း"""
     if st.session_state.user_role == "Admin":
         return db_reset_password(username)
     return False
