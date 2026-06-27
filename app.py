@@ -1,21 +1,13 @@
 import streamlit as st
-import socket
 import sys
 import os
 
-# Root Directory ကို ရှာဖွေပြီး Path ထဲသို့ ထည့်ခြင်း (အရေးကြီးသည်)
-current_dir = os.path.dirname(os.path.abspath(__file__))
-root_dir = os.path.dirname(current_dir)
+# Root Directory ကို Python Path ထဲသို့ ထည့်ခြင်း (ဒါမှသာ components များကို အမှားမရှိခေါ်နိုင်မည်)
+root_dir = os.path.dirname(os.path.abspath(__file__))
 if root_dir not in sys.path:
     sys.path.append(root_dir)
 
-# ယခုမှသာ အောက်ပါအတိုင်း import လုပ်ပါ
-from auth import logout, change_password
-from language import get_text
-
-# ... ကျန်ရှိသော code များ ...
-
-# Import Modules
+# --- Imports ---
 from auth import check_password, init_auth_state
 from utils import init_app_state
 from config import init_session
@@ -68,7 +60,7 @@ def run_router():
     
     current_menu = st.session_state.get("menu", "POS System")
     
-    # Security Check
+    # Security: Admin မဟုတ်လျှင် User Management ဝင်မရအောင်တားပါ
     if current_menu == "User Management" and role != "Admin":
         current_menu = "POS System"
         st.session_state.menu = "POS System"
