@@ -1,15 +1,16 @@
 import streamlit as st
 import socket
+import sys
+import os
+
+# Root ကို path ထဲထည့်ခြင်း
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Imports
 from auth import logout, change_password
 from language import get_text
-from components.supabase_logic import sync_to_supabase
-
-# --- Imports ---
-from auth import logout, change_password
-from language import get_text
-# အဓိကအချက်- components.supabase_logic ဟု ရေးခြင်းက အသေချာဆုံးဖြစ်သည်
-from components.supabase_logic import sync_to_supabase
-
+# ဒီနေရာမှာ 'components.' ကို ဖြုတ်လိုက်ပါ
+from supabase_logic import sync_to_supabase
 # ... (ကျန်ရှိသော Code များ မပြောင်းလဲပါ) ...
 
 # --- Imports ---
