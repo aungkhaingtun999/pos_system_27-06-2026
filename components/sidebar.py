@@ -3,14 +3,20 @@ import socket
 import sys
 import os
 
-# ==========================================
-# PATH SETUP
-# ==========================================
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.dirname(CURRENT_DIR)
+# --- Path Fix ---
+# sidebar.py သည် components folder ထဲတွင်ရှိနေသည်
+# ထို့ကြောင့် root directory (အပြင်ဖက် folder) ကို python path ထဲသို့ အတင်းထည့်ပေးခြင်း
+current_dir = os.path.dirname(os.path.abspath(__file__))
+root_dir = os.path.dirname(current_dir)
+if root_dir not in sys.path:
+    sys.path.insert(0, root_dir)
 
-if ROOT_DIR not in sys.path:
-    sys.path.insert(0, ROOT_DIR)
+# --- Imports ---
+from auth import logout, change_password
+from language import get_text
+# အရေးကြီး: sys.path ထဲတွင် root_dir ရှိနေပြီဖြစ်သောကြောင့် 
+# 'components.supabase_logic' ဟု ခေါ်နိုင်ပါပြီ
+from components.supabase_logic import sync_to_supabase
 
 # ==========================================
 # IMPORTS
