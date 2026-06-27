@@ -1,4 +1,5 @@
 ﻿import sys
+print(sys.path)
 import os
 # လက်ရှိ folder ကို path ထဲထည့်ခြင်း
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
