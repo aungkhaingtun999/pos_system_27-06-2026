@@ -1,7 +1,13 @@
 import streamlit as st
 import socket
+import sys
+import os
+
+# ဖိုင်တည်နေရာကို Python Path ထဲသို့ အတင်းထည့်ပေးခြင်း (Fix)
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from auth import logout, change_password
-from language import get_text 
+from language import get_text
 
 # ==========================================
 # 2. Helper Functions (Connection & Navigation)
