@@ -17,7 +17,8 @@ from language import get_text
 # from components.supabase_logic import sync_to_supabase
 
 # အသစ် (ဤသို့ ပြင်ဆင်ပါ)
-from supabase_logic import sync_to_supabase
+# components/sidebar.py ၏ 20-line ဝန်းကျင်ကို ဤသို့ပြင်ပါ
+from .supabase_logic import sync_to_supabase
 # ==========================================
 # Helper Functions
 # ==========================================
