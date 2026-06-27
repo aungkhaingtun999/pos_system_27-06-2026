@@ -1,9 +1,14 @@
+import streamlit as st
 import sys
 import os
-# လက်ရှိ folder ကို path ထဲထည့်ခြင်း
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-import streamlit as st
+# Project root ကို sys.path တွင် ထည့်သွင်းခြင်း (Import Error များကို ဖြေရှင်းရန်)
+# ဤနည်းသည် app.py သည်မည်သည့်နေရာတွင်ရှိနေစေကာမူ အမြစ် (root) ကို ရှာတွေ့စေပါမည်။
+root_path = os.path.dirname(os.path.abspath(__file__))
+if root_path not in sys.path:
+    sys.path.append(root_path)
+
+# Import Modules
 from auth import check_password, init_auth_state
 from utils import init_app_state
 from config import init_session
@@ -18,15 +23,23 @@ from components.supabase_logic import insert_sale_to_supabase
 from components.user_management import show_user_management
 
 def setup_page():
-    st.set_page_config(page_title="Barcode POS System", layout="wide", initial_sidebar_state="expanded")
+    st.set_page_config(
+        page_title="Barcode POS System", 
+        layout="wide", 
+        initial_sidebar_state="expanded"
+    )
 
 def auto_sync_on_start():
-    """App စဖွင့်သည်နှင့် Internet ရှိပါက Pending Sales များကို Cloud သို့ Sync လုပ်ခြင်း"""
+    """App စဖွင့်သည်နှင့် Pending Sales များကို Cloud သို့ Sync လုပ်ခြင်း"""
     if "pending_sales" in st.session_state and st.session_state.pending_sales:
         with st.spinner("🌐 Cloud နှင့် ချိတ်ဆက်နေသည်..."):
             for sale in list(st.session_state.pending_sales):
                 try:
-                    insert_sale_to_supabase(sale['cart'], sale['totals'], sale['rec_no'], sale['payment_method'], sale['customer'])
+                    insert_sale_to_supabase(
+                        sale['cart'], sale['totals'], 
+                        sale['rec_no'], sale['payment_method'], 
+                        sale['customer']
+                    )
                     st.session_state.pending_sales.remove(sale)
                 except Exception:
                     st.warning("အင်တာနက် အားနည်းနေ၍ Sync မအောင်မြင်ပါ။")
@@ -36,7 +49,7 @@ def run_router():
     """Role-based Navigation Router"""
     role = st.session_state.get("user_role", "Cashier")
     
-    # 1. Menu Mapping အပြည့်အစုံ
+    # Menu Mapping
     menu_map = {
         "POS System": show_pos_system,
         "Inventory": show_inventory,
@@ -46,15 +59,14 @@ def run_router():
         "User Management": show_user_management
     }
     
-    # 2. လက်ရှိ Menu ကိုရယူပါ
     current_menu = st.session_state.get("menu", "POS System")
     
-    # 3. Security: Admin မဟုတ်လျှင် User Management ဝင်မရအောင်တားပါ
+    # Security Check
     if current_menu == "User Management" and role != "Admin":
         current_menu = "POS System"
         st.session_state.menu = "POS System"
     
-    # 4. ရွေးချယ်ထားသော Menu ကို ခေါ်ပြပါ
+    # Render Selected Component
     if current_menu in menu_map:
         menu_map[current_menu]()
     else:
@@ -66,20 +78,16 @@ def main():
     init_app_state()
     init_session()
 
-    # Login စစ်ဆေးခြင်း
+    # Login Logic
     if not check_password(): 
         st.stop()
         
-    # App စဖွင့်ချိန် Auto Sync လုပ်ခြင်း
+    # Sync & Navigation
     auto_sync_on_start()
-    
-    # Sidebar ပြသခြင်း (Sidebar ထဲတွင် Role အလိုက် menu_items ကိုစီမံထားပါ)
     show_sidebar()
-    
-    # Main Content Route
     run_router()
 
-    # --- Receipt Logic ---
+    # Receipt Display Logic
     if st.session_state.get("receipt") is not None:
         show_receipt(
             data=st.session_state.receipt,
@@ -89,7 +97,6 @@ def main():
             customer=st.session_state.get("current_customer", "Walk-in")
         )
         
-        # Receipt ပြပြီးလျှင် Session ကို ပြန်လည်ရှင်းလင်းခြင်း
         if st.button("Close Receipt"):
             st.session_state.receipt = None
             st.session_state.receipt_totals = None
