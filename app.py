@@ -15,7 +15,7 @@ from components.profit_loss import show_profit_loss
 from components.refund import show_refund
 from components.receipt_generator import show_receipt 
 from components.supabase_logic import insert_sale_to_supabase
-from components.user_management import show_user_management # Import အသစ်ထည့်ထားသည်
+from components.user_management import show_user_management
 
 def setup_page():
     st.set_page_config(page_title="Barcode POS System", layout="wide", initial_sidebar_state="expanded")
@@ -36,21 +36,25 @@ def run_router():
     """Role-based Navigation Router"""
     role = st.session_state.get("user_role", "Cashier")
     
+    # 1. Menu Mapping အပြည့်အစုံ
     menu_map = {
         "POS System": show_pos_system,
         "Inventory": show_inventory,
         "Reports": show_reports,
         "Profit & Loss": show_profit_loss, 
         "Refund": show_refund,
+        "User Management": show_user_management
     }
     
-    # Admin အတွက် User Management ထည့်ခြင်း
-    if role == "Admin":
-        menu_map["User Management"] = show_user_management
-
+    # 2. လက်ရှိ Menu ကိုရယူပါ
     current_menu = st.session_state.get("menu", "POS System")
     
-    # ရွေးချယ်ထားသော Menu ကို ခေါ်ပြခြင်း (Menu မရှိရင် POS သို့ပြန်ပို့)
+    # 3. Security: Admin မဟုတ်လျှင် User Management ဝင်မရအောင်တားပါ
+    if current_menu == "User Management" and role != "Admin":
+        current_menu = "POS System"
+        st.session_state.menu = "POS System"
+    
+    # 4. ရွေးချယ်ထားသော Menu ကို ခေါ်ပြပါ
     if current_menu in menu_map:
         menu_map[current_menu]()
     else:
@@ -69,7 +73,7 @@ def main():
     # App စဖွင့်ချိန် Auto Sync လုပ်ခြင်း
     auto_sync_on_start()
     
-    # Sidebar ပြသခြင်း
+    # Sidebar ပြသခြင်း (Sidebar ထဲတွင် Role အလိုက် menu_items ကိုစီမံထားပါ)
     show_sidebar()
     
     # Main Content Route
