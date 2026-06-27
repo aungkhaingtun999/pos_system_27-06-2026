@@ -1,15 +1,8 @@
 import streamlit as st
 import socket
-import sys
-import os
-
-# Project root ကို path ထဲသို့ ထည့်ခြင်း
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-# ယခုမှသာ auth နှင့် language ကို import လုပ်ပါ
-from auth import logout, change_password
-from language import get_text
-
+# အောက်ပါအတိုင်း ပြင်ပါ
+from ..auth import logout, change_password
+from ..language import get_text
 # ==========================================
 # Helper Functions
 # ==========================================
