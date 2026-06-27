@@ -15,9 +15,7 @@ from components.profit_loss import show_profit_loss
 from components.refund import show_refund
 from components.receipt_generator import show_receipt 
 from components.supabase_logic import insert_sale_to_supabase
-
-# အကယ်၍ User Management အတွက် သီးခြား file ရှိလျှင် import လုပ်ပါ
-# from components.user_management import show_user_management 
+from components.user_management import show_user_management # Import အသစ်ထည့်ထားသည်
 
 def setup_page():
     st.set_page_config(page_title="Barcode POS System", layout="wide", initial_sidebar_state="expanded")
@@ -46,14 +44,13 @@ def run_router():
         "Refund": show_refund,
     }
     
-    # Admin အတွက်သာ ခွင့်ပြုထားသော Menu များ
+    # Admin အတွက် User Management ထည့်ခြင်း
     if role == "Admin":
-        # menu_map["User Management"] = show_user_management
-        pass
+        menu_map["User Management"] = show_user_management
 
     current_menu = st.session_state.get("menu", "POS System")
     
-    # ရွေးချယ်ထားသော Menu ကို ခေါ်ပြခြင်း
+    # ရွေးချယ်ထားသော Menu ကို ခေါ်ပြခြင်း (Menu မရှိရင် POS သို့ပြန်ပို့)
     if current_menu in menu_map:
         menu_map[current_menu]()
     else:
