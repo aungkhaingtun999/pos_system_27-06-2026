@@ -1,4 +1,4 @@
-﻿# ==========================================
+# ==========================================
 # 1. Imports
 # ==========================================
 import streamlit as st
@@ -12,19 +12,20 @@ import json
 try:
     supabase = create_client(SUPABASE_CONFIG["url"], SUPABASE_CONFIG["key"])
 except Exception as e:
-    st.error(f"Supabase Client Error: {e}")
+    st.error(f"Supabase Connection Error: {e}")
     supabase = None
 
 # ==========================================
-# 3. Database Operations (Users & Auth)
+# 3. Database Operations (Users, Auth & Roles)
 # ==========================================
 
 def get_all_users():
-    """Supabase မှ User စာရင်းအားလုံးကို ရယူခြင်း"""
+    """Supabase မှ User စာရင်းအားလုံး (Role ပါ) ရယူခြင်း"""
     if not supabase: return {}
     try:
-        response = supabase.table("users").select("username, password").execute()
-        return {item["username"]: item["password"] for item in response.data}
+        # Username, Password, Role အားလုံးကို ဆွဲထုတ်ခြင်း
+        response = supabase.table("users").select("username, password, role").execute()
+        return {item["username"]: {"password": item["password"], "role": item["role"]} for item in response.data}
     except Exception as e:
         print(f"Error fetching users: {e}")
         return {}
@@ -40,10 +41,10 @@ def update_password_db(username, new_password):
         return False
 
 def reset_password(username):
-    """Password အား '123456' သို့ ပြန်လည်သတ်မှတ်ခြင်း"""
+    """Password အား '123' သို့ ပြန်လည်သတ်မှတ်ခြင်း"""
     if not supabase: return False
     try:
-        supabase.table("users").update({"password": "123456"}).eq("username", username).execute()
+        supabase.table("users").update({"password": "123"}).eq("username", username).execute()
         return True
     except Exception as e:
         print(f"Error resetting password: {e}")
@@ -57,40 +58,36 @@ def sync_to_supabase():
     """Local Session မှ Pending Data များကို Supabase သို့ Sync လုပ်ခြင်း"""
     if not supabase: return
     
-    # Session state ထဲမှာ Pending Data ရှိမရှိ စစ်ဆေးခြင်း
     if "pending_sales" in st.session_state and st.session_state.pending_sales:
         success_count = 0
         for sale in list(st.session_state.pending_sales):
             try:
-                # အရောင်းမှတ်တမ်းတစ်ခုချင်းစီကို Cloud သို့ ပို့ခြင်း
                 data = {
                     "receipt_no": sale['rec_no'],
                     "customer_name": sale['customer'],
                     "grand_total": float(sale['totals'].get("grand_total", 0)),
                     "payment_type": sale['payment_method'],
-                    "item": json.dumps(sale['cart'], ensure_ascii=False),
+                    "items": json.dumps(sale['cart'], ensure_ascii=False), # items ဟုပြင်ပေးထားပါသည်
                     "totals": json.dumps(sale['totals'], ensure_ascii=False)
                 }
                 supabase.table("sales").insert(data).execute()
-                
-                # အောင်မြင်ပါက Pending list မှ ဖယ်ထုတ်ခြင်း
                 st.session_state.pending_sales.remove(sale)
                 success_count += 1
             except Exception as e:
-                print(f"Sync Error for {sale['rec_no']}: {e}")
-                break # တစ်ခုခု error တက်ရင် ရပ်ထားမည်
+                print(f"Sync Error for {sale.get('rec_no')}: {e}")
+                break 
         
         if success_count > 0:
-            st.success(f"✅ အရောင်း {success_count} ခု Sync အောင်မြင်ပါသည်။")
+            st.success(f"✅ အရောင်း {success_count} ခု Cloud သို့ Sync လုပ်ပြီးပါပြီ။")
 
 def insert_single_sale(sale_data):
-    """တစ်ခါတည်း အရောင်းတစ်ခုကို Cloud သို့ ပို့ခြင်း"""
+    """အရောင်းတစ်ခုကို Cloud သို့ ချက်ချင်းပို့ခြင်း"""
     if not supabase: return False
     try:
         supabase.table("sales").insert(sale_data).execute()
         return True
     except Exception as e:
-        print(f"Error syncing to Supabase: {e}")
+        print(f"Error inserting to Supabase: {e}")
         return False
 
 # ==========================================
