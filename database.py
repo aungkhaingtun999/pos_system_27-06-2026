@@ -13,7 +13,7 @@ def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     
-    # Tables creation
+    # Sales Table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS sales (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -27,6 +27,7 @@ def init_db():
         )
     ''')
     
+    # Products Table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS products (
             barcode TEXT PRIMARY KEY,
@@ -37,7 +38,7 @@ def init_db():
         )
     ''')
     
-    # Role ပါဝင်သော Users table
+    # Users Table (Role ပါဝင်သည်)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
@@ -46,7 +47,7 @@ def init_db():
         )
     ''')
     
-    # Default Users (Admin နဲ့ Cashier)
+    # Default Admin & Staff
     cursor.execute("INSERT OR IGNORE INTO users (username, password, role) VALUES ('admin', '123', 'Admin'), ('staff1', '123', 'Cashier')")
     
     conn.commit()
@@ -65,7 +66,7 @@ def get_user_from_db(username, password):
     return None
 
 def get_all_users():
-    """Admin အတွက် user စာရင်းထုတ်ပေးခြင်း"""
+    """အသုံးပြုသူအားလုံးစာရင်း (Admin အတွက်)"""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("SELECT username, role FROM users")
@@ -118,7 +119,7 @@ def save_sale(cart, totals, receipt_no=None, payment_method="Cash", customer_nam
     finally:
         conn.close()
 
-# --- 4. Report Operations ---
+# --- 4. Report & Inventory Operations ---
 def get_sales():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -141,4 +142,5 @@ def get_report_by_date(start_date, end_date):
     conn.close()
     return rows
 
+# App စတင်ချိန်တွင် Database ကို အသင့်ပြင်ဆင်ခြင်း
 init_db()
