@@ -1,15 +1,8 @@
 import streamlit as st
 import socket
-import sys
-import os
-
-# --- Import Path Fix (Root Directory ကို အမြဲသိအောင် လုပ်ခြင်း) ---
-# sidebar.py သည် components folder ထဲတွင်ရှိသဖြင့် 
-# အပြင်ဘက် (Root) ကို path ထဲသို့ ထည့်ပေးခြင်း
-current_dir = os.path.dirname(os.path.abspath(__file__))
-root_dir = os.path.dirname(current_dir)
-if root_dir not in sys.path:
-    sys.path.append(root_dir)
+from auth import logout, change_password
+from language import get_text
+from components.supabase_logic import sync_to_supabase
 
 # --- Imports ---
 from auth import logout, change_password
