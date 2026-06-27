@@ -1,12 +1,19 @@
 import streamlit as st
+import socket
 import sys
 import os
 
-# Project root ကို sys.path တွင် ထည့်သွင်းခြင်း (Import Error များကို ဖြေရှင်းရန်)
-# ဤနည်းသည် app.py သည်မည်သည့်နေရာတွင်ရှိနေစေကာမူ အမြစ် (root) ကို ရှာတွေ့စေပါမည်။
-root_path = os.path.dirname(os.path.abspath(__file__))
-if root_path not in sys.path:
-    sys.path.append(root_path)
+# Root Directory ကို ရှာဖွေပြီး Path ထဲသို့ ထည့်ခြင်း (အရေးကြီးသည်)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+root_dir = os.path.dirname(current_dir)
+if root_dir not in sys.path:
+    sys.path.append(root_dir)
+
+# ယခုမှသာ အောက်ပါအတိုင်း import လုပ်ပါ
+from auth import logout, change_password
+from language import get_text
+
+# ... ကျန်ရှိသော code များ ...
 
 # Import Modules
 from auth import check_password, init_auth_state
