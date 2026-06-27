@@ -1,4 +1,5 @@
 import streamlit as st
+import requests
 import socket
 from auth import logout, change_password
 from language import get_text 
@@ -21,7 +22,7 @@ def _handle_menu_change(selected_menu):
     st.rerun()
 
 # ==========================================
-# 3. Sidebar UI Module
+# 3. Main Run Module (Sidebar UI)
 # ==========================================
 def show_sidebar():
     """Sidebar UI - Role-based access ပါဝင်သည်။"""
@@ -41,8 +42,10 @@ def show_sidebar():
             st.rerun()
             
         # 3. User Info
-        role = st.session_state.get("user_role", "Cashier") # default role
-        st.write(f"👤 User: **{st.session_state.get('username', 'User')}**")
+        # အရေးကြီးချက်: role ကို session ကမရရင် 'Cashier' လို့ သတ်မှတ်ပေးထားသည်
+        role = st.session_state.get("user_role", "Cashier") 
+        username = st.session_state.get('username', 'User')
+        st.write(f"👤 User: **{username}**")
         st.caption(f"🛡️ Role: {role}")
         
         # 4. Sync Data
@@ -61,19 +64,24 @@ def show_sidebar():
         # အကောင့်အမျိုးအစားအလိုက် Menu စစ်ဆေးခြင်း
         menu_items = ["POS System"]
         
+        # Role ပေါ်မူတည်ပြီး Menu များ ထပ်ဖြည့်ခြင်း
         if role in ["Admin", "Inventory Manager"]:
             menu_items.append("Inventory")
             
         if role == "Admin":
-            menu_items.extend(["Reports", "Profit & Loss"])
+            menu_items.extend(["Reports", "Profit & Loss", "User Management"])
             
-        menu_items.append("Refund") # Refund ကို လိုအပ်ရင် အားလုံးသုံးခွင့်ပေးနိုင်သည်
+        menu_items.append("Refund")
 
+        # လက်ရှိ menu က menu_items ထဲမှာ ရှိမရှိ စစ်ဆေးပြီးမှ index ရှာပါ
         current_menu = st.session_state.get("menu", "POS System")
+        if current_menu not in menu_items:
+            current_menu = "POS System"
+            
         selected_menu = st.radio(
             "📌 Main Menu", 
             menu_items, 
-            index=menu_items.index(current_menu) if current_menu in menu_items else 0
+            index=menu_items.index(current_menu)
         )
         
         if selected_menu != current_menu:
