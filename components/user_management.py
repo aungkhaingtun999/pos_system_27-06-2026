@@ -1,6 +1,9 @@
 import streamlit as st
-from database import get_all_users, reset_password
-import sqlite3
+from supabase import create_client
+
+# Supabase ချိတ်ဆက်ခြင်း (secrets ထဲတွင် ထည့်ထားရန်လိုအပ်သည်)
+# st.secrets["SUPABASE_URL"] နှင့် st.secrets["SUPABASE_KEY"] ကို သေချာစစ်ဆေးပါ
+supabase = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
 
 def show_user_management():
     st.subheader("👥 User Management (Admin Only)")
@@ -16,38 +19,46 @@ def show_user_management():
             if submitted:
                 if new_user and new_pass:
                     try:
-                        conn = sqlite3.connect("sales.db")
-                        cursor = conn.cursor()
-                        cursor.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", 
-                                       (new_user, new_pass, role))
-                        conn.commit()
-                        conn.close()
+                        # Supabase သို့ Data ပေးပို့ခြင်း
+                        data = {
+                            "username": new_user,
+                            "password": new_pass,
+                            "role": role
+                        }
+                        response = supabase.table("users").insert(data).execute()
                         st.success(f"User {new_user} ကို ထည့်သွင်းပြီးပါပြီ။")
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Error: Username ရှိပြီးသားဖြစ်နေနိုင်ပါသည်။ ({e})")
+                        st.error(f"Error: ဖြစ်နိုင်ခြေရှိသော အမှား - {e}")
     
-    # 2. လက်ရှိ User များကို ပြသပြီး Reset လုပ်ခြင်း
+    # 2. လက်ရှိ User များကို ပြသခြင်း
     st.divider()
     st.write("### လက်ရှိ User စာရင်း")
-    users = get_all_users() # database.py ထဲက function ကို သုံးသည်
     
-    for username, role in users.items():
-        col1, col2, col3 = st.columns([2, 1, 1])
-        col1.write(f"**{username}** ({role})")
-        if col2.button("Reset Password", key=f"reset_{username}"):
-            if reset_password(username):
-                st.success(f"{username} ၏ Password ကို 123 သို့ ပြန်ပြောင်းပြီးပါပြီ။")
-                st.rerun()
-        
-        # User ဖျက်ရန်
-        if col3.button("Delete", key=f"del_{username}"):
-            if username != "admin": # admin ကို ဖျက်လို့မရအောင်
-                conn = sqlite3.connect("sales.db")
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM users WHERE username = ?", (username,))
-                conn.commit()
-                conn.close()
-                st.rerun()
-            else:
-                col3.warning("Admin ကို ဖျက်၍မရပါ။")
+    # Supabase မှ Data ဆွဲထုတ်ခြင်း
+    response = supabase.table("users").select("*").execute()
+    users = response.data
+    
+    if users:
+        for user in users:
+            col1, col2, col3 = st.columns([2, 1, 1])
+            col1.write(f"👤 **{user['username']}** ({user['role']})")
+            
+            # Password Reset
+            if col2.button("Reset Pwd", key=f"reset_{user['id']}"):
+                try:
+                    supabase.table("users").update({"password": "123"}).eq("id", user['id']).execute()
+                    st.success(f"{user['username']} ၏ Password ကို 123 သို့ ပြန်ပြောင်းပြီးပါပြီ။")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Reset လုပ်ရာတွင် အမှားဖြစ်သည်: {e}")
+            
+            # User ဖျက်ရန်
+            if col3.button("Delete", key=f"del_{user['id']}"):
+                if user['username'] != "admin": 
+                    supabase.table("users").delete().eq("id", user['id']).execute()
+                    st.rerun()
+                else:
+                    col3.warning("Admin ကို ဖျက်၍မရပါ။")
+    else:
+        st.info("User စာရင်း မရှိသေးပါ။")
