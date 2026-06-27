@@ -23,6 +23,11 @@ from language import get_text
 
 # အသစ် (ဤသို့ပြင်ပါ)
 from .supabase_logic import sync_to_supabase
+# အဟောင်း (Error တက်နေတာ)
+# from components.supabase_logic import sync_to_supabase
+
+# အသစ် (ဤသို့သာ ရေးပါ)
+from supabase_logic import sync_to_supabase
 
 # ==========================================
 # IMPORTS
