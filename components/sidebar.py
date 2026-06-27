@@ -3,22 +3,19 @@ import socket
 import sys
 import os
 
-# Root ကို path ထဲထည့်ခြင်း
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-# Imports
-from auth import logout, change_password
-from language import get_text
-# ဒီနေရာမှာ 'components.' ကို ဖြုတ်လိုက်ပါ
-from supabase_logic import sync_to_supabase
-# ... (ကျန်ရှိသော Code များ မပြောင်းလဲပါ) ...
+# --- Path Fix ---
+# Root Directory ကို Python Path ထဲသို့ ထည့်ခြင်းဖြင့် Import ပြဿနာများကို ဖြေရှင်းသည်
+current_dir = os.path.dirname(os.path.abspath(__file__))
+root_dir = os.path.dirname(current_dir)
+if root_dir not in sys.path:
+    sys.path.append(root_dir)
 
 # --- Imports ---
+# Root path ကို ထည့်ထားပြီးဖြစ်သဖြင့် Root အောက်ရှိ ဖိုင်များကို တိုက်ရိုက်ခေါ်နိုင်သည်
 from auth import logout, change_password
 from language import get_text
-# အရေးကြီး: from .supabase_logic မသုံးပါနှင့်၊ components folder ထဲတွင်ရှိသောကြောင့် 
-# root path ကို fix လုပ်ပြီးပါက တိုက်ရိုက်ခေါ်နိုင်သည်
-from supabase_logic import sync_to_supabase
+# components folder ထဲက ဖိုင်ဖြစ်သောကြောင့် components. ကို ရှေ့ကခံ၍ ခေါ်ရပါမည်
+from components.supabase_logic import sync_to_supabase
 
 # ==========================================
 # Helper Functions
