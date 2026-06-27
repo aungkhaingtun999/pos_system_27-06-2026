@@ -3,7 +3,10 @@ import re
 from supabase import create_client
 
 # Supabase Client Initialize လုပ်ခြင်း
-supabase = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
+# သေချာစေရန် Secrets မှ URL နှင့် Key ကို ခေါ်ယူပါ
+url = st.secrets["SUPABASE_URL"]
+key = st.secrets["SUPABASE_KEY"]
+supabase = create_client(url, key)
 
 # ==========================================
 # 1. Initialization
@@ -20,18 +23,30 @@ def init_auth_state():
 # 2. Database Helpers (Supabase Queries)
 # ==========================================
 def get_user_from_db(username, password):
-    """Supabase မှ User ကို ရှာပြီး Role နှင့်တကွ ပြန်ပေးခြင်း"""
-    response = supabase.table("users").select("*").eq("username", username).eq("password", password).execute()
-    if response.data:
-        return response.data[0]
-    return None
+    """Username ကိုသာရှာပြီး Python ဘက်တွင် Password ကို တိုက်စစ်ခြင်း"""
+    try:
+        # Username ကိုသာ Query လုပ်ပါ
+        response = supabase.table("users").select("*").eq("username", username).execute()
+        
+        if response.data:
+            user = response.data[0]
+            # Database ထဲက password နှင့် တိုက်စစ်ပါ (Space များကို strip လုပ်ပေးပါ)
+            if str(user.get("password", "")).strip() == str(password).strip():
+                return user
+        return None
+    except Exception as e:
+        st.error(f"Database Error: {e}")
+        return None
 
 def update_password_db(username, old_password, new_password):
     """Password အဟောင်းမှန်မမှန်စစ်၍ အသစ်ပြောင်းခြင်း"""
     user = get_user_from_db(username, old_password)
     if user:
-        supabase.table("users").update({"password": new_password}).eq("username", username).execute()
-        return True
+        try:
+            supabase.table("users").update({"password": new_password}).eq("username", username).execute()
+            return True
+        except:
+            return False
     return False
 
 def reset_password(username):
