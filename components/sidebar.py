@@ -3,12 +3,20 @@ import socket
 import sys
 import os
 
-# --- Path Fix ---
-# Root Directory ကို Python Path ထဲသို့ ထည့်ခြင်းဖြင့် Import ပြဿနာများကို ဖြေရှင်းသည်
+# Root Directory ကို Path ထဲသို့ ထည့်ခြင်း
 current_dir = os.path.dirname(os.path.abspath(__file__))
 root_dir = os.path.dirname(current_dir)
 if root_dir not in sys.path:
     sys.path.append(root_dir)
+
+# --- Imports ---
+from auth import logout, change_password
+from language import get_text
+
+# [အရေးကြီးဆုံးပြင်ဆင်ချက်] 
+# sidebar.py နဲ့ supabase_logic.py က folder တစ်ခုတည်းမှာရှိလို့ 
+# 'components.' ကို ဖြုတ်လိုက်ပါ
+from supabase_logic import sync_to_supabase
 
 # --- Imports ---
 # Root path ကို ထည့်ထားပြီးဖြစ်သဖြင့် Root အောက်ရှိ ဖိုင်များကို တိုက်ရိုက်ခေါ်နိုင်သည်
