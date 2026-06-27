@@ -3,14 +3,16 @@ import socket
 import sys
 import os
 
-# --- Path Fix ---
-# sidebar.py သည် components folder ထဲတွင်ရှိနေသည်
-# ထို့ကြောင့် root directory (အပြင်ဖက် folder) ကို python path ထဲသို့ အတင်းထည့်ပေးခြင်း
+# Root folder ကို ရှာဖွေပြီး path ထဲကို ထည့်ခြင်း
 current_dir = os.path.dirname(os.path.abspath(__file__))
-root_dir = os.path.dirname(current_dir)
-if root_dir not in sys.path:
-    sys.path.insert(0, root_dir)
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.append(parent_dir)
 
+# Imports - ဤနေရာတွင် 'components.' ကို ဖြုတ်လိုက်ပါ
+from auth import logout, change_password
+from language import get_text
+from components.supabase_logic import sync_to_supabase
 # --- Imports ---
 from auth import logout, change_password
 from language import get_text
