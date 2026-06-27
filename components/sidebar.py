@@ -25,15 +25,15 @@ def _handle_menu_change(selected_menu):
 # 3. Main Run Module (Sidebar UI)
 # ==========================================
 def show_sidebar():
-    """Sidebar UI - Role-based access ပါဝင်သည်။"""
+    """Sidebar UI ကို Render လုပ်ပေးသော Main module"""
     with st.sidebar:
-        # 1. Internet Status
+        # Internet Status
         if _check_internet():
             st.success(get_text("Online", st.session_state.get("lang")))
         else:
             st.error(get_text("Offline", st.session_state.get("lang")))
 
-        # 2. Language Switcher
+        # Language Switcher
         lang_options = ["MY", "EN"]
         current_lang = st.session_state.get("lang", "MY")
         lang = st.selectbox("🌐 Language", lang_options, index=lang_options.index(current_lang))
@@ -41,14 +41,13 @@ def show_sidebar():
             st.session_state.lang = lang
             st.rerun()
             
-        # 3. User Info
-        # အရေးကြီးချက်: role ကို session ကမရရင် 'Cashier' လို့ သတ်မှတ်ပေးထားသည်
-        role = st.session_state.get("user_role", "Cashier") 
+        # User Info & Role (Session ထဲကနေ Role ကို သေချာဖတ်ယူပါ)
+        role = st.session_state.get("user_role", "Cashier")
         username = st.session_state.get('username', 'User')
         st.write(f"👤 User: **{username}**")
         st.caption(f"🛡️ Role: {role}")
         
-        # 4. Sync Data
+        # Sync Data
         if st.button("🔄 Sync Data Now", key="sync_btn", use_container_width=True):
             if _check_internet():
                 from sales_data import sync_to_supabase
@@ -60,24 +59,27 @@ def show_sidebar():
         
         st.markdown("---")
         
-        # 5. Role-Based Menu Navigation
+        # --- Role-Based Menu Logic ---
         # အကောင့်အမျိုးအစားအလိုက် Menu စစ်ဆေးခြင်း
         menu_items = ["POS System"]
         
-        # Role ပေါ်မူတည်ပြီး Menu များ ထပ်ဖြည့်ခြင်း
+        # Admin သို့မဟုတ် Inventory Manager ဖြစ်မှသာ Inventory မြင်ရမည်
         if role in ["Admin", "Inventory Manager"]:
             menu_items.append("Inventory")
             
+        # Admin သာလျှင် Reports နှင့် Profit & Loss ကို မြင်ရမည်
         if role == "Admin":
-            menu_items.extend(["Reports", "Profit & Loss", "User Management"])
+            menu_items.extend(["Reports", "Profit & Loss"])
             
         menu_items.append("Refund")
-
-        # လက်ရှိ menu က menu_items ထဲမှာ ရှိမရှိ စစ်ဆေးပြီးမှ index ရှာပါ
+        
+        # လက်ရှိ menu ကို သတ်မှတ်ခြင်း
         current_menu = st.session_state.get("menu", "POS System")
+        # မရှိတော့တဲ့ Menu တစ်ခုခုမှာ ရောက်နေရင် POS သို့ပြန်ပို့ပေးခြင်း
         if current_menu not in menu_items:
             current_menu = "POS System"
-            
+            st.session_state.menu = "POS System"
+        
         selected_menu = st.radio(
             "📌 Main Menu", 
             menu_items, 
@@ -89,7 +91,7 @@ def show_sidebar():
         
         st.markdown("---")
         
-        # 6. Password & Logout Management
+        # Password & Logout
         if st.button("🔑 Change Password", key="chg_pwd", use_container_width=True): 
             st.session_state.show_pwd_change = True
             
