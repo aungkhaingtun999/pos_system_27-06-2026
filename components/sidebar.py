@@ -1,8 +1,13 @@
 import streamlit as st
 import socket
-# အောက်ပါအတိုင်း ပြင်ပါ
-from ..auth import logout, change_password
-from ..language import get_text
+import sys
+import os
+
+# Project root ကို sys.path မှာ ထည့်ပေးလိုက်တာက အသေချာဆုံးပါ
+sys.path.append(os.getcwd())
+
+from auth import logout, change_password
+from language import get_text
 # ==========================================
 # Helper Functions
 # ==========================================
