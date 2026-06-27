@@ -1,4 +1,4 @@
-﻿import sqlite3
+import sqlite3
 import json
 from datetime import datetime, timezone, timedelta
 
@@ -12,6 +12,8 @@ def get_myanmar_time():
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
+    
+    # Tables creation
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS sales (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -24,6 +26,7 @@ def init_db():
             is_synced INTEGER DEFAULT 0
         )
     ''')
+    
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS products (
             barcode TEXT PRIMARY KEY,
@@ -33,17 +36,64 @@ def init_db():
             sell_price REAL
         )
     ''')
+    
+    # Role ပါဝင်သော Users table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
-            password TEXT
+            password TEXT,
+            role TEXT DEFAULT 'Cashier'
         )
     ''')
-    cursor.execute("INSERT OR IGNORE INTO users (username, password) VALUES ('admin', '123'), ('staff1', '123')")
+    
+    # Default Users (Admin နဲ့ Cashier)
+    cursor.execute("INSERT OR IGNORE INTO users (username, password, role) VALUES ('admin', '123', 'Admin'), ('staff1', '123', 'Cashier')")
+    
     conn.commit()
     conn.close()
 
-# --- 2. Sales Operations ---
+# --- 2. User Authentication & Role Management ---
+def get_user_from_db(username, password):
+    """Login ဝင်ချိန်တွင် User နှင့် Role ကို စစ်ဆေးခြင်း"""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT username, role FROM users WHERE username = ? AND password = ?", (username, password))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return {"username": row[0], "role": row[1]}
+    return None
+
+def get_all_users():
+    """Admin အတွက် user စာရင်းထုတ်ပေးခြင်း"""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT username, role FROM users")
+    users = {row[0]: row[1] for row in cursor.fetchall()}
+    conn.close()
+    return users
+
+def update_password_db(username, old_pass, new_pass):
+    """Password အဟောင်းမှန်မှသာ အသစ်ပြောင်းခြင်း"""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET password = ? WHERE username = ? AND password = ?", (new_pass, username, old_pass))
+    affected = cursor.rowcount > 0
+    conn.commit()
+    conn.close()
+    return affected
+
+def reset_password(username):
+    """Admin အနေဖြင့် Password ကို 123 သို့ Reset လုပ်ခြင်း"""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET password = ? WHERE username = ?", ("123", username))
+    affected = cursor.rowcount > 0
+    conn.commit()
+    conn.close()
+    return affected
+
+# --- 3. Sales Operations ---
 def save_sale(cart, totals, receipt_no=None, payment_method="Cash", customer_name=None):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -68,32 +118,6 @@ def save_sale(cart, totals, receipt_no=None, payment_method="Cash", customer_nam
     finally:
         conn.close()
 
-# --- 3. User Authentication ---
-def get_all_users():
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT username, password FROM users")
-    users = {row[0]: row[1] for row in cursor.fetchall()}
-    conn.close()
-    return users
-
-def update_password_db(username, new_password):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("UPDATE users SET password = ? WHERE username = ?", (new_password, username))
-    conn.commit()
-    conn.close()
-    return True
-
-def reset_password(username):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("UPDATE users SET password = ? WHERE username = ?", ("123456", username))
-    affected = cursor.rowcount > 0
-    conn.commit()
-    conn.close()
-    return affected
-
 # --- 4. Report Operations ---
 def get_sales():
     conn = sqlite3.connect(DB_NAME)
@@ -104,21 +128,15 @@ def get_sales():
     return rows
 
 def get_report_by_date(start_date, end_date):
-    """SQLite တွင် ရက်စွဲကို DATE() function ဖြင့် တိကျစွာ filter လုပ်ခြင်း"""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    
-    # နေ့စွဲကို string format သို့ပြောင်းခြင်း
     s_date = start_date.strftime('%Y-%m-%d')
     e_date = end_date.strftime('%Y-%m-%d')
-    
-    # sale_date ထဲမှ ရက်စွဲကိုသာ ထုတ်ယူပြီး နှိုင်းယှဉ်ခြင်း (Time ကို လျစ်လျူရှုမည်)
     cursor.execute('''
         SELECT * FROM sales 
         WHERE DATE(sale_date) BETWEEN DATE(?) AND DATE(?) 
         ORDER BY sale_date DESC
     ''', (s_date, e_date))
-    
     rows = cursor.fetchall()
     conn.close()
     return rows
