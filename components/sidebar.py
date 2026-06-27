@@ -1,5 +1,4 @@
 import streamlit as st
-import requests
 import socket
 from auth import logout, change_password
 from language import get_text 
@@ -18,6 +17,7 @@ def _check_internet():
 def _handle_menu_change(selected_menu):
     """Menu ပြောင်းလဲမှုကို စီမံခန့်ခွဲခြင်း"""
     st.session_state.menu = selected_menu
+    # st.query_params သည် Streamlit version အသစ်များအတွက်သုံးပါ
     st.query_params["menu"] = selected_menu
     st.rerun()
 
@@ -41,7 +41,7 @@ def show_sidebar():
             st.session_state.lang = lang
             st.rerun()
             
-        # User Info & Role (Session ထဲကနေ Role ကို သေချာဖတ်ယူပါ)
+        # User Info & Role
         role = st.session_state.get("user_role", "Cashier")
         username = st.session_state.get('username', 'User')
         st.write(f"👤 User: **{username}**")
@@ -50,7 +50,7 @@ def show_sidebar():
         # Sync Data
         if st.button("🔄 Sync Data Now", key="sync_btn", use_container_width=True):
             if _check_internet():
-                from sales_data import sync_to_supabase
+                from components.supabase_logic import sync_to_supabase # Path မှန်အောင်ပြင်ထားပါ
                 with st.spinner("Syncing..."):
                     sync_to_supabase()
                 st.success("✅ Success")
@@ -60,7 +60,6 @@ def show_sidebar():
         st.markdown("---")
         
         # --- Role-Based Menu Logic ---
-        # အကောင့်အမျိုးအစားအလိုက် Menu စစ်ဆေးခြင်း
         menu_items = ["POS System"]
         
         # Admin သို့မဟုတ် Inventory Manager ဖြစ်မှသာ Inventory မြင်ရမည်
@@ -69,12 +68,13 @@ def show_sidebar():
             
         # Admin သာလျှင် Reports နှင့် Profit & Loss ကို မြင်ရမည်
         if role == "Admin":
-            menu_items.extend(["Reports", "Profit & Loss"])
+            menu_items.extend(["Reports", "Profit & Loss", "User Management"]) # User Management ထည့်ထားသည်
             
         menu_items.append("Refund")
         
         # လက်ရှိ menu ကို သတ်မှတ်ခြင်း
         current_menu = st.session_state.get("menu", "POS System")
+        
         # မရှိတော့တဲ့ Menu တစ်ခုခုမှာ ရောက်နေရင် POS သို့ပြန်ပို့ပေးခြင်း
         if current_menu not in menu_items:
             current_menu = "POS System"
