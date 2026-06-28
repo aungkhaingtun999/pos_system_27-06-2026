@@ -2,7 +2,7 @@ import streamlit as st
 import json
 from supabase import create_client
 from datetime import datetime
-
+from .supabase_logic import process_sale_stock_update, insert_sale_to_supabase, supabase
 # ==========================================
 # 1. Connection Initialization
 # ==========================================
