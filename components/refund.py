@@ -259,3 +259,57 @@ def show_refund():
             st.error(
                 str(e)
             )
+# ==========================================
+# 5. Update Sales Status
+# ==========================================
+
+supabase.table(
+    "sales"
+).update(
+
+    {
+        "status": "refunded"
+    }
+
+).eq(
+
+    "id",
+    invoice_id
+
+).execute()
+
+
+
+# Verify Update
+
+verify = (
+
+    supabase
+    .table("sales")
+    .select(
+        "status"
+    )
+    .eq(
+        "id",
+        invoice_id
+    )
+    .single()
+    .execute()
+
+)
+
+
+
+if not verify.data:
+
+    raise Exception(
+        "Sales record မတွေ့ပါ"
+    )
+
+
+
+if verify.data.get("status") != "refunded":
+
+    raise Exception(
+        "Sales Status Update မအောင်မြင်ပါ"
+    )
