@@ -1,14 +1,15 @@
 import sys
 import os
 import streamlit as st
-from components import supabase_logic 
 
-# Root directory 
+# Root directory path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+# Modules
 from auth import check_password, init_auth_state
 from utils import init_app_state
 from config import init_session
+from components.supabase_logic import sync_to_supabase # Sync function ကို အပေါ်မှာ သေချာ import လုပ်ပါ
 from components.sidebar import show_sidebar
 from components.pos_system import show_pos_system
 from components.reports import show_reports
@@ -18,36 +19,41 @@ from components.refund import show_refund
 from components.receipt import show_receipt
 
 def setup_page():
-    st.set_page_config(page_title="Barcode POS System", layout="wide")
-
-# app.py အတွင်းရှိ Auto Sync function
-# app.py ၏ auto_sync_on_start function
-# app.py ၏ အစပိုင်းတွင် သို့မဟုတ် Sync လုပ်သည့်နေရာတွင်
-# app.py
-from components.supabase_logic import sync_to_supabase
+    # setup_page မှာ st.set_page_config ကို တစ်ကြိမ်သာ ခေါ်ရပါမယ်
+    if "page_config_set" not in st.session_state:
+        st.set_page_config(page_title="Barcode POS System", layout="wide")
+        st.session_state.page_config_set = True
 
 def auto_sync_on_start():
     # session_state ထဲက pending_sales ကိုယူပါ
     pending_data = st.session_state.get("pending_sales", [])
     
-    if pending_data and isinstance(pending_data, list):
+    # Data ရှိမှသာ Sync လုပ်ပါ
+    if pending_data and isinstance(pending_data, list) and len(pending_data) > 0:
         try:
-            # ဤနေရာတွင် pending_data ကို argument အဖြစ် ပို့ပေးလိုက်ပါ
+            # Argument အနေနဲ့ pending_data ကို ပို့ပေးလိုက်ပါ
             sync_to_supabase(pending_data)
             
             # Sync အောင်မြင်မှသာ ရှင်းပါ
             st.session_state.pending_sales = []
             st.success("✅ Cloud နှင့် Sync အောင်မြင်ပါသည်။")
         except Exception as e:
-            st.error(f"Sync Failed: {e}")def main():
+            st.error(f"Sync Failed: {e}")
+
+def main():
     setup_page()
     init_auth_state()
     init_app_state()
     init_session()
 
-    if not check_password(): st.stop()
+    # Authentication
+    if not check_password(): 
+        st.stop()
     
+    # Sync လုပ်ဆောင်ခြင်း
     auto_sync_on_start()
+    
+    # Sidebar
     show_sidebar()
     
     # Page Router
@@ -58,7 +64,9 @@ def auto_sync_on_start():
         "Profit & Loss": show_profit_loss, 
         "Refund": show_refund,
     }
-    menu_map.get(st.session_state.get("menu", "POS System"), show_pos_system)()
+    
+    current_menu = st.session_state.get("menu", "POS System")
+    menu_map.get(current_menu, show_pos_system)()
 
     # Receipt Logic
     if st.session_state.get("receipt") is not None:
