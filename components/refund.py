@@ -5,10 +5,12 @@ from components.supabase_logic import supabase, execute_refund
 def show_refund():
     st.title("🔄 Refund Manager")
 
+    # Message ရှင်းလင်းခြင်း
     if "msg" in st.session_state and st.session_state.msg:
         st.success(st.session_state.msg)
         st.session_state.msg = None
 
+    # Database Data ဆွဲယူခြင်း
     try:
         response = supabase.table("sales").select("*").order("id", desc=True).execute()
         sales_data = response.data if response.data else []
@@ -18,7 +20,6 @@ def show_refund():
     
     options = {f"📄 {r.get('receipt_no')} {'[REFUNDED]' if r.get('status') == 'refunded' else ''}": r for r in sales_data}
     selected = st.selectbox("🔍 Select Receipt to Refund:", [""] + list(options.keys()))
-    
     inv = options.get(selected) if selected else None
 
     if inv:
@@ -27,7 +28,9 @@ def show_refund():
         else:
             items = json.loads(inv.get('item', '[]')) if isinstance(inv.get('item'), str) else inv.get('item', [])
             
-            # Form ကို Checkbox တွက်ချက်မှုအတွက် ပြင်ဆင်ခြင်း
+            st.subheader(f"📋 Items in {inv.get('receipt_no')}")
+            
+            # Form မစခင် Checkbox state ကို စစ်ဆေးပါ
             with st.form("refund_form"):
                 total_refund_value = 0
                 selected_refund_items = []
@@ -36,12 +39,16 @@ def show_refund():
                     price = float(item.get('sell_price') or item.get('price') or 0)
                     qty = int(item.get('qty', 1))
                     
-                    # Checkbox 
-                    if st.checkbox(f"{item.get('product_name')} (Qty: {qty}, Price: {price:,.0f})", key=f"chk_{i}"):
+                    # Checkbox တိုင်းကို unique key ပေးထားပါ
+                    is_checked = st.checkbox(f"{item.get('product_name')} | Qty: {qty} | Price: {price:,.0f}", key=f"chk_{inv['id']}_{i}")
+                    
+                    if is_checked:
                         selected_refund_items.append(item)
                         total_refund_value += (price * qty)
                 
+                st.write("---")
                 st.write(f"### 💰 Total Refund Amount: {total_refund_value:,.2f} MMK")
+                
                 submitted = st.form_submit_button("⚠️ Confirm Process Refund")
                 
                 if submitted:
