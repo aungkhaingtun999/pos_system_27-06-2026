@@ -24,7 +24,7 @@ def _get_client():
 supabase = _get_client()
 
 # ==========================================
-# 2. Sale Functions
+# 2. Sale & Stock Functions
 # ==========================================
 def insert_sale(cart, totals, receipt_no, payment_method, customer_name):
     """Database သို့ Sales အသစ်ထည့်ခြင်း"""
@@ -40,6 +40,18 @@ def insert_sale(cart, totals, receipt_no, payment_method, customer_name):
         "status": "active" 
     }
     return supabase.table("sales").insert(data).execute()
+
+def process_sale_stock_update(cart):
+    """Sale လုပ်သည့်အခါ Stock ကို အလိုအလျောက် နုတ်ပေးခြင်း"""
+    if not supabase: return
+    for item in cart:
+        barcode = str(item.get("barcode"))
+        qty = int(item.get("qty", 0))
+        
+        product = supabase.table("products").select("stock_qty").eq("barcode", barcode).single().execute().data
+        if product:
+            new_stock = int(product.get("stock_qty", 0)) - qty
+            supabase.table("products").update({"stock_qty": new_stock}).eq("barcode", barcode).execute()
 
 def sync_to_supabase(pending_sales):
     """Offline မှရရှိသော Pending Sales များအားလုံးကို Cloud သို့ တင်ပေးခြင်း"""
@@ -98,5 +110,4 @@ def execute_refund(inv, items_to_refund):
         return total_refunded
 
     except Exception as e:
-        # လုပ်ငန်းစဉ်တစ်ခုခုမှားယွင်းလျှင် Error ပြန်တက်စေရန်
         raise Exception(f"Refund လုပ်ဆောင်စဉ် အမှားဖြစ်ပွားသည်: {e}")
