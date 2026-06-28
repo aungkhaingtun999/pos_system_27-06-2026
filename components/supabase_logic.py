@@ -221,7 +221,6 @@ def sync_to_supabase(
 
 
 # =====================================================
-# =====================================================
 # REFUND PROCESS
 # =====================================================
 
@@ -231,7 +230,6 @@ def execute_refund(
         refund_amount=None
 ):
 
-
     if not supabase:
 
         raise Exception(
@@ -240,7 +238,6 @@ def execute_refund(
 
 
     try:
-
 
         receipt_no = inv.get(
             "receipt_no"
@@ -260,16 +257,14 @@ def execute_refund(
 
 
         # ==========================================
-        # 1. Check Current Sales Status
+        # 1. Check Sales Status
         # ==========================================
 
         sales_check = (
 
             supabase
             .table("sales")
-            .select(
-                "status"
-            )
+            .select("status")
             .eq(
                 "id",
                 invoice_id
@@ -282,18 +277,16 @@ def execute_refund(
 
         if sales_check.data:
 
-
-            status = sales_check.data.get(
+            current_status = sales_check.data.get(
                 "status"
             )
 
 
-            if status == "refunded":
+            if current_status == "refunded":
 
                 raise Exception(
                     "⚠️ ဒီ Receipt ကို Refund လုပ်ပြီးသားဖြစ်ပါသည်။"
                 )
-
 
 
 
@@ -307,9 +300,7 @@ def execute_refund(
 
             supabase
             .table("refunds")
-            .select(
-                "id"
-            )
+            .select("id")
             .eq(
                 "receipt_no",
                 receipt_no
@@ -321,11 +312,9 @@ def execute_refund(
 
         if refund_check.data:
 
-
             raise Exception(
                 "⚠️ ဒီ Receipt အတွက် Refund History ရှိပြီးသားဖြစ်ပါသည်။"
             )
-
 
 
 
@@ -336,7 +325,6 @@ def execute_refund(
         # ==========================================
 
         if refund_amount is None:
-
 
             refund_amount = 0.0
 
@@ -352,19 +340,18 @@ def execute_refund(
                 )
 
 
-                sell_price = safe_float(
+                price = safe_float(
+
                     item.get(
                         "sell_price",
                         0
                     )
+
                 )
 
 
                 refund_amount += (
-
-                    qty *
-                    sell_price
-
+                    qty * price
                 )
 
 
@@ -374,9 +361,7 @@ def execute_refund(
         )
 
 
-
         if refund_amount <= 0:
-
 
             raise Exception(
                 "Refund Amount 0 ဖြစ်နေပါသည်။"
@@ -387,9 +372,8 @@ def execute_refund(
 
 
 
-
         # ==========================================
-        # 4. Insert Refund Record
+        # 4. Insert Refund History
         # ==========================================
 
         refund_data = {
@@ -400,7 +384,6 @@ def execute_refund(
                 receipt_no,
 
 
-
             "items":
 
                 json.dumps(
@@ -409,11 +392,9 @@ def execute_refund(
                 ),
 
 
-
             "refund_amount":
 
                 refund_amount,
-
 
 
             "refunded_at":
@@ -421,11 +402,9 @@ def execute_refund(
                 get_myanmar_time(),
 
 
-
             "status":
 
                 "completed",
-
 
 
             "details":
@@ -451,7 +430,6 @@ def execute_refund(
 
         if not refund_result.data:
 
-
             raise Exception(
                 "Refund History သိမ်း၍မရပါ"
             )
@@ -462,44 +440,75 @@ def execute_refund(
 
 
         # ==========================================
-# Update Sales Status
-# ==========================================
+        # 5. Update Sales Status
+        # ==========================================
 
-supabase.table(
-    "sales"
-).update(
-    {
-        "status": "refunded"
-    }
-).eq(
-    "id",
-    inv["id"]
-).execute()
+        supabase.table(
+            "sales"
+        ).update(
 
+            {
+                "status": "refunded"
+            }
 
-# Verify only
-verify = (
-    supabase
-    .table("sales")
-    .select("status")
-    .eq(
-        "id",
-        inv["id"]
-    )
-    .single()
-    .execute()
-)
+        ).eq(
+
+            "id",
+            invoice_id
+
+        ).execute()
 
 
-if not verify.data:
-
-    raise Exception(
-        "Sales record မတွေ့ပါ"
-    )
 
 
-if verify.data.get("status") != "refunded":
 
-    raise Exception(
-        "Sales Status Update မအောင်မြင်ပါ"
-    )
+        # ==========================================
+        # 6. Verify Sales Update
+        # ==========================================
+
+        verify = (
+
+            supabase
+            .table("sales")
+            .select(
+                "status"
+            )
+            .eq(
+                "id",
+                invoice_id
+            )
+            .single()
+            .execute()
+
+        )
+
+
+        if not verify.data:
+
+            raise Exception(
+                "Sales record မတွေ့ပါ"
+            )
+
+
+
+        if verify.data.get("status") != "refunded":
+
+            raise Exception(
+                "Sales Status Update မအောင်မြင်ပါ"
+            )
+
+
+
+
+        return refund_amount
+
+
+
+
+
+    except Exception as e:
+
+
+        raise Exception(
+            f"Refund Failed : {e}"
+        )
