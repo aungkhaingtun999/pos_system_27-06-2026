@@ -33,19 +33,18 @@ def setup_page():
     )
 
 def auto_sync_on_start():
-    """App စဖွင့်သည်နှင့် Internet ရှိပါက Pending Sales များကို Cloud သို့ Sync လုပ်ခြင်း"""
+    # pending_sales ရှိမရှိ စစ်ဆေးပါ
     if "pending_sales" in st.session_state and st.session_state.pending_sales:
         with st.spinner("🌐 Cloud နှင့် ချိတ်ဆက်နေသည်..."):
             try:
-                # sync_to_supabase function ကို စာရင်းတစ်ခုလုံးပေး၍ ခေါ်ပါ
+                # ဤနေရာတွင် () အတွင်း၌ data ထည့်ပေးလိုက်ပါ
                 sync_to_supabase(st.session_state.pending_sales)
                 
-                # အောင်မြင်ပါက Pending စာရင်းကို ရှင်းလင်းပါ
+                # အောင်မြင်ရင် pending_sales ကို ရှင်းပစ်ပါ
                 st.session_state.pending_sales = []
-                st.success("✅ အားလုံး Sync လုပ်ပြီးပါပြီ။")
+                st.success("✅ Sync အောင်မြင်ပါသည်။")
             except Exception as e:
-                st.warning(f"အင်တာနက် အားနည်းနေ၍ Sync မအောင်မြင်ပါ။ ({e})")
-
+                st.warning(f"Sync Failed: {e}")
 def run_router():
     """Menu ရွေးချယ်မှုအလိုက် Page ပြောင်းလဲခြင်း"""
     menu_map = {
