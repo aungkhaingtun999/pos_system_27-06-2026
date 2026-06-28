@@ -26,17 +26,21 @@ from components.supabase_logic import sync_to_supabase
 
 # app.py ၏ auto_sync_on_start()
 def auto_sync_on_start():
-    # Session state ကို စစ်ဆေးပါ
-    if "pending_sales" in st.session_state and isinstance(st.session_state.pending_sales, list):
-        if len(st.session_state.pending_sales) > 0:
-            try:
-                # Import လုပ်ထားသော function ကို ခေါ်ပါ
-                from components.supabase_logic import sync_to_supabase
-                sync_to_supabase(st.session_state.pending_sales)
-                st.session_state.pending_sales = []
-                st.success("✅ အားလုံး Sync လုပ်ပြီးပါပြီ။")
-            except Exception as e:
-                st.warning(f"Sync အဆင်မပြေပါ: {e}")
+    # Session ကို ဖျက်မပစ်ပါနှင့်
+    pending_data = st.session_state.get("pending_sales", [])
+    
+    if pending_data and isinstance(pending_data, list):
+        try:
+            # Sync လုပ်ပါ
+            from components.supabase_logic import sync_to_supabase
+            sync_to_supabase(pending_data)
+            
+            # Sync ပြီးရင် session ထဲက data ကိုပဲ ရှင်းပါ (တစ်ခုလုံးမရှင်းပါနှင့်)
+            st.session_state.pending_sales = []
+            st.success("✅ Cloud သို့ Sync လုပ်ပြီးပါပြီ။")
+        except Exception as e:
+            # Error တက်ရင် login ကို မထိပါနှင့်
+            st.warning(f"Sync မအောင်မြင်ပါ: {e}")
 def main():
     setup_page()
     init_auth_state()
