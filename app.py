@@ -22,22 +22,20 @@ def setup_page():
 
 # app.py အတွင်းရှိ Auto Sync function
 # app.py ၏ auto_sync_on_start function
-def auto_sync_on_start():
-    # Session state ကို စစ်ဆေးပါ
-    pending_data = st.session_state.get("pending_sales", [])
-    
-    if pending_data and isinstance(pending_data, list):
-        with st.spinner("🌐 Cloud နှင့် ချိတ်ဆက်နေသည်..."):
-            try:
-                # နာမည်အသစ်ဖြင့် ခေါ်ပြီး pending_data ကို argument အနေဖြင့် ပို့ပေးပါ
-                from components.supabase_logic import perform_full_sync
-                perform_full_sync(pending_data)
-                
-                st.session_state.pending_sales = []
-                st.success("✅ အားလုံး Sync လုပ်ပြီးပါပြီ။")
-            except Exception as e:
-                st.warning(f"Sync အဆင်မပြေပါ: {e}")
+from components.supabase_logic import sync_to_supabase
 
+def auto_sync_on_start():
+    # pending_sales က list ဟုတ်မဟုတ် စစ်ဆေးခြင်း
+    if "pending_sales" in st.session_state and isinstance(st.session_state.pending_sales, list):
+        pending_data = st.session_state.pending_sales
+        if len(pending_data) > 0:
+            try:
+                # Argument ကို သေချာပို့ပေးခြင်းဖြင့် missing argument error ကို ဖြေရှင်းသည်
+                sync_to_supabase(pending_data)
+                st.session_state.pending_sales = []
+                st.success("✅ Sync အောင်မြင်ပါသည်။")
+            except Exception as e:
+                st.warning(f"Sync မအောင်မြင်ပါ: {e}")
 def main():
     setup_page()
     init_auth_state()
