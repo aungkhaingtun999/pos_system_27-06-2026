@@ -1,70 +1,409 @@
 import streamlit as st
 import json
+
 from supabase import create_client
 from datetime import datetime
 import pytz
 
-# Supabase Client
+
+
+# =====================================================
+# SUPABASE CONNECTION
+# =====================================================
+
 @st.cache_resource
 def get_supabase_client():
-    url = st.secrets.get("SUPABASE_URL")
-    key = st.secrets.get("SUPABASE_KEY")
-    return create_client(url, key) if url and key else None
+
+    url = st.secrets.get(
+        "SUPABASE_URL"
+    )
+
+    key = st.secrets.get(
+        "SUPABASE_KEY"
+    )
+
+
+    if url and key:
+
+        return create_client(
+            url,
+            key
+        )
+
+
+    return None
+
+
 
 supabase = get_supabase_client()
 
-# components/supabase_logic.py
-def sync_to_supabase(pending_sales):
-    """Offline မှ data များကို Cloud သို့ Sync လုပ်ခြင်း"""
-    if not pending_sales or not isinstance(pending_sales, list):
+
+
+# =====================================================
+# TIME
+# =====================================================
+
+def get_myanmar_time():
+
+    return datetime.now(
+        pytz.timezone(
+            "Asia/Yangon"
+        )
+    ).isoformat()
+
+
+
+# =====================================================
+# SAFE NUMBER
+# =====================================================
+
+def safe_float(value):
+
+    try:
+
+        if value is None:
+            return 0
+
+
+        if isinstance(value,str):
+
+            value=value.replace(
+                ",",
+                ""
+            )
+
+
+        return float(value)
+
+
+    except:
+
+        return 0
+
+
+
+
+# =====================================================
+# SYNC SALES TO SUPABASE
+# =====================================================
+
+def sync_to_supabase(
+        pending_sales
+):
+
+
+    if not supabase:
+
+        raise Exception(
+            "Database Connection မရှိပါ"
+        )
+
+
+
+    if not pending_sales:
+
         return
 
+
+
     for sale in pending_sales:
-        # သင်၏ DB Insert Logic ဤနေရာတွင်
-        supabase.table("sales").insert({
-            "receipt_no": sale.get('rec_no'),
-            "item": json.dumps(sale.get('cart')),
-            "grand_total": sale.get('totals', {}).get('grand_total'),
-            "status": "active"
-        }).execute()
-    """Sync logic: pending_sales (list) ကို အတိအကျ လက်ခံသည်"""
-    if not supabase: raise Exception("Database Connection မရှိပါ။")
-    for sale in pending_sales:
-        # insert_sale function ကို ခေါ်ခြင်း
-        data = {
-            "receipt_no": sale['rec_no'],
-            "customer_name": sale['customer'],
-            "grand_total": float(sale['totals'].get("grand_total", 0)),
-            "payment_type": sale['payment_method'],
-            "created_at": datetime.now(pytz.timezone('Asia/Yangon')).isoformat(),
-            "item": json.dumps(sale['cart'], ensure_ascii=False),
-            "totals": json.dumps(sale['totals'], ensure_ascii=False),
-            "status": "active"
+
+
+        data={
+
+
+            "receipt_no":
+                sale.get(
+                    "rec_no"
+                ),
+
+
+
+            "customer_name":
+                sale.get(
+                    "customer",
+                    ""
+                ),
+
+
+
+            "grand_total":
+                safe_float(
+
+                    sale
+                    .get(
+                        "totals",
+                        {}
+                    )
+                    .get(
+                        "grand_total",
+                        0
+                    )
+
+                ),
+
+
+
+            "payment_type":
+                sale.get(
+                    "payment_method",
+                    ""
+                ),
+
+
+
+            "created_at":
+                get_myanmar_time(),
+
+
+
+            "item":
+                json.dumps(
+                    sale.get(
+                        "cart",
+                        []
+                    ),
+                    ensure_ascii=False
+                ),
+
+
+
+            "totals":
+                json.dumps(
+                    sale.get(
+                        "totals",
+                        {}
+                    ),
+                    ensure_ascii=False
+                ),
+
+
+
+            "status":
+                "active"
+
         }
-        supabase.table("sales").insert(data).execute()
 
-def execute_refund(inv, items_to_refund):
-    """Refund Logic: Double Check ဖြင့် Refund လုပ်သည်"""
-    if not supabase: return 0
-    
-    # 1. DB မှ နောက်ဆုံး status ကို စစ်ခြင်း
-    check = supabase.table("sales").select("status").eq("id", inv['id']).single().execute().data
-    if check and check.get("status") == "refunded":
-        raise Exception("⚠️ ဤပြေစာအား Refund လုပ်ပြီးသားဖြစ်၍ ထပ်မံလုပ်ဆောင်၍ မရပါ။")
 
-    # 2. Status update လုပ်ခြင်း
-    supabase.table("sales").update({"status": "refunded"}).eq("id", inv['id']).execute()
-    
-    total_refunded = sum([float(item.get('price', 0)) * int(item.get('qty', 1)) for item in items_to_refund])
-    
-    # 3. Refund table သို့ ထည့်ခြင်း
-    refund_data = {
-        "receipt_no": inv.get('receipt_no'),
-        "items": json.dumps(items_to_refund, ensure_ascii=False),
-        "refund_amount": float(total_refunded),
-        "refunded_at": datetime.now(pytz.timezone('Asia/Yangon')).isoformat(),
-        "status": "completed",
-        "details": f"Refunded {len(items_to_refund)} items"
-    }
-    supabase.table("refunds").insert(refund_data).execute()
-    return total_refunded
+
+        supabase.table(
+            "sales"
+        ).insert(
+            data
+        ).execute()
+
+
+
+
+
+# =====================================================
+# EXECUTE REFUND
+# =====================================================
+
+def execute_refund(
+        inv,
+        items_to_refund,
+        refund_amount=None
+):
+
+
+    if not supabase:
+
+        raise Exception(
+            "Database Connection မရှိပါ"
+        )
+
+
+
+    try:
+
+
+
+        # ----------------------------------
+        # Latest Status Check
+        # ----------------------------------
+
+        check=(
+
+            supabase
+            .table(
+                "sales"
+            )
+            .select(
+                "status"
+            )
+            .eq(
+                "id",
+                inv["id"]
+            )
+            .single()
+            .execute()
+
+        )
+
+
+
+        if (
+
+            check.data
+
+            and
+
+            check.data.get(
+                "status"
+            )
+            ==
+            "refunded"
+
+        ):
+
+            raise Exception(
+                "⚠️ Already refunded"
+            )
+
+
+
+
+
+        # ----------------------------------
+        # Calculate Refund Amount
+        # ----------------------------------
+
+        if refund_amount is None:
+
+
+            refund_amount=0
+
+
+            for item in items_to_refund:
+
+
+                qty=int(
+
+                    item.get(
+                        "qty",
+                        1
+                    )
+
+                )
+
+
+                sell_price=safe_float(
+
+                    item.get(
+                        "sell_price",
+                        0
+                    )
+
+                )
+
+
+                refund_amount += (
+
+                    qty *
+                    sell_price
+
+                )
+
+
+
+
+
+        # ----------------------------------
+        # Update Sales
+        # ----------------------------------
+
+        supabase.table(
+            "sales"
+        ).update(
+
+            {
+
+                "status":
+                    "refunded",
+
+                "refund_amount":
+                    refund_amount
+
+            }
+
+        ).eq(
+
+            "id",
+            inv["id"]
+
+        ).execute()
+
+
+
+
+
+        # ----------------------------------
+        # Insert Refund History
+        # ----------------------------------
+
+        refund_data={
+
+
+            "receipt_no":
+                inv.get(
+                    "receipt_no"
+                ),
+
+
+
+            "items":
+                json.dumps(
+                    items_to_refund,
+                    ensure_ascii=False
+                ),
+
+
+
+            "refund_amount":
+                float(
+                    refund_amount
+                ),
+
+
+
+            "refunded_at":
+                get_myanmar_time(),
+
+
+
+            "status":
+                "completed",
+
+
+
+            "details":
+                (
+                    f"Refunded "
+                    f"{len(items_to_refund)} items"
+                )
+
+        }
+
+
+
+        supabase.table(
+            "refunds"
+        ).insert(
+            refund_data
+        ).execute()
+
+
+
+
+        return refund_amount
+
+
+
+
+    except Exception as e:
+
+
+        raise Exception(
+            f"Refund Failed : {e}"
+        )
