@@ -26,17 +26,16 @@ def setup_page():
 from components.supabase_logic import sync_to_supabase
 
 def auto_sync_on_start():
-    # Session state မှ data ကို အရင်ယူပါ
-    pending_data = st.session_state.get("pending_sales", [])
-    
-    # Data ရှိမှသာ function ကို argument နဲ့ ခေါ်ပါ
-    if isinstance(pending_data, list) and len(pending_data) > 0:
-        try:
-            sync_to_supabase(pending_data) # <--- ဤနေရာတွင် pending_data ကို ထည့်ပေးရပါမည်
-            st.session_state.pending_sales = []
-            st.success("✅ Sync လုပ်ပြီးပါပြီ။")
-        except Exception as e:
-            st.error(f"Sync Failed: {e}")
+    # pending_sales ရှိမှသာ Sync လုပ်ပါ
+    if "pending_sales" in st.session_state and isinstance(st.session_state.pending_sales, list):
+        if len(st.session_state.pending_sales) > 0:
+            try:
+                # ဤနေရာတွင် argument ပို့ပေးလိုက်ပါ
+                sync_to_supabase(st.session_state.pending_sales)
+                st.session_state.pending_sales = []
+                st.success("✅ အားလုံး Sync လုပ်ပြီးပါပြီ။")
+            except Exception as e:
+                st.error(f"Sync Failed: {e}")
 def main():
     setup_page()
     init_auth_state()
