@@ -1,18 +1,14 @@
 import streamlit as st
 import json
-import sys
-import os
 from components.supabase_logic import supabase, execute_refund
 
 def show_refund():
     st.title("🔄 Refund Manager")
 
-    # Session State ရှင်းလင်းခြင်း
     if "msg" in st.session_state and st.session_state.msg:
         st.success(st.session_state.msg)
         st.session_state.msg = None
 
-    # Database မှ Data ဆွဲယူခြင်း
     try:
         response = supabase.table("sales").select("*").order("id", desc=True).execute()
         sales_data = response.data if response.data else []
@@ -29,46 +25,35 @@ def show_refund():
         if inv.get('status') == 'refunded':
             st.error("⚠️ ဤပြေစာအား Refund လုပ်ပြီးသားဖြစ်၍ ထပ်မံလုပ်ဆောင်၍ မရပါ။")
         else:
-            st.subheader(f"📋 Items in {inv.get('receipt_no')}")
             items = json.loads(inv.get('item', '[]')) if isinstance(inv.get('item'), str) else inv.get('item', [])
-
-            # --- Form စတင်ခြင်း ---
+            
+            # Form ကို Checkbox တွက်ချက်မှုအတွက် ပြင်ဆင်ခြင်း
             with st.form("refund_form"):
-                # Checkbox များ၏ State ကို သိမ်းဆည်းရန်အတွက် session_state တွင် ခေတ္တသိမ်းပါ
-                selected_refund_items = []
                 total_refund_value = 0
+                selected_refund_items = []
                 
                 for i, item in enumerate(items):
                     price = float(item.get('sell_price') or item.get('price') or 0)
                     qty = int(item.get('qty', 1))
                     
-                    col1, col2, col3 = st.columns([0.5, 0.25, 0.25])
-                    # Checkbox အမှန်ခြစ်ကို ဖမ်းယူခြင်း
-                    if col1.checkbox(f"{item.get('product_name', 'Item')}", key=f"chk_{i}"):
+                    # Checkbox 
+                    if st.checkbox(f"{item.get('product_name')} (Qty: {qty}, Price: {price:,.0f})", key=f"chk_{i}"):
                         selected_refund_items.append(item)
                         total_refund_value += (price * qty)
-                    col2.write(f"Qty: {qty}")
-                    col3.write(f"Price: {price:,.0f}")
                 
-                # လှပအောင် Display လုပ်ခြင်း
-                st.write("---")
                 st.write(f"### 💰 Total Refund Amount: {total_refund_value:,.2f} MMK")
-                
-                # --- Submit Button ---
                 submitted = st.form_submit_button("⚠️ Confirm Process Refund")
                 
                 if submitted:
                     if not selected_refund_items:
-                        st.warning("Please select at least one item.")
+                        st.warning("အနည်းဆုံး Item တစ်ခု ရွေးချယ်ပေးပါ။")
                     else:
                         try:
-                            # 1. Double Verification: နောက်ဆုံးအကြိမ် DB စစ်ခြင်း
+                            # နောက်ဆုံး Status ထပ်စစ် (Double Verification)
                             check = supabase.table("sales").select("status").eq("id", inv['id']).single().execute().data
-                            
                             if check and check.get("status") == "refunded":
                                 st.error("❌ ဤပြေစာကို Refund လုပ်ပြီးသွားပါပြီ။")
                             else:
-                                # 2. Refund လုပ်ဆောင်ခြင်း
                                 processed = execute_refund(inv, selected_refund_items)
                                 st.session_state.msg = f"✅ Refund {processed:,.2f} MMK processed!"
                                 st.rerun() 
