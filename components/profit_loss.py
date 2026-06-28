@@ -2,8 +2,7 @@ import streamlit as st
 import json
 import pandas as pd
 from datetime import datetime
-from database import get_sales
-from products import get_products_cached
+from components.supabase_logic import supabase
 from config import APP_SETTINGS
 
 def show_profit_loss():
@@ -14,31 +13,37 @@ def show_profit_loss():
     start_date = col_a.date_input("Start Date", value=datetime.now().date())
     end_date = col_b.date_input("End Date", value=datetime.now().date())
 
-    # 2. Data Fetching
-    sales = get_sales()
-    products = get_products_cached()
-    
-    if not sales:
-        st.info("လက်ရှိတွင် အရောင်းမှတ်တမ်း မရှိသေးပါ။")
+    # 2. Supabase မှ တိုက်ရိုက် Data ဆွဲထုတ်ခြင်း (database.py ကို မသုံးတော့ပါ)
+    try:
+        sales_resp = supabase.table("sales").select("*").execute()
+        sales_data = sales_resp.data or []
+        
+        products_resp = supabase.table("products").select("*").execute()
+        products_data = products_resp.data or []
+        product_map = {str(p.get('barcode')): p for p in products_data}
+    except Exception as e:
+        st.error(f"Database Error: {e}")
         return
 
-    # 3. Processing and Filtering (Data များကို သေချာစွာ စစ်ထုတ်ခြင်း)
+    if not sales_data:
+        st.info("Database ထဲတွင် အရောင်းမှတ်တမ်း မရှိသေးပါ။")
+        return
+
+    # 3. Processing and Filtering
     total_sales = 0
     total_cost = 0
     filtered_sales = []
-    product_map = {str(p.get('barcode')): p for p in products}
 
-    for sale in sales:
-        # sale[2] သည် ရက်စွဲဖြစ်သည်ဟု ယူဆသည် (ရက်စွဲဖော်မတ်ကို သေချာအောင်လုပ်ပါ)
-        raw_date = pd.to_datetime(sale[2])
+    for sale in sales_data:
+        # created_at က string ဖြစ်ရင် datetime ပြောင်းခြင်း
+        raw_date = pd.to_datetime(sale.get('created_at'))
         sale_date = raw_date.date()
 
-        # ရက်စွဲစစ်ခြင်း (Start Date <= Sale Date <= End Date)
+        # ရက်စွဲစစ်ခြင်း
         if start_date <= sale_date <= end_date:
             try:
-                items_data = json.loads(sale[3]) if isinstance(sale[3], str) else sale[3]
-                totals_data = json.loads(sale[4]) if isinstance(sale[4], str) else sale[4]
-                if isinstance(totals_data, list): totals_data = totals_data[0]
+                items_data = json.loads(sale.get('item', '[]'))
+                totals_data = json.loads(sale.get('totals', '{}'))
                 
                 grand_total = float(totals_data.get("grand_total", 0))
                 total_sales += grand_total
@@ -48,15 +53,14 @@ def show_profit_loss():
                     barcode = str(item.get('barcode'))
                     qty = int(item.get('qty', 1))
                     prod = product_map.get(barcode, {})
-                    buy_price = float(prod.get('buy_price', 0))
+                    buy_price = float(prod.get('cost_price', 0)) # cost_price ကို သုံးပါ
                     total_cost += (buy_price * qty)
                 
-                # Table အတွက် စုဆောင်းခြင်း
                 filtered_sales.append({
-                    "ပြေစာအမှတ်": sale[1],
-                    "ရက်စွဲ": raw_date.strftime('%Y-%m-%d %H:%M'), # DateTime ကို String ပြောင်းပြခြင်း
+                    "ပြေစာအမှတ်": sale.get('receipt_no'),
+                    "ရက်စွဲ": raw_date.strftime('%Y-%m-%d %H:%M'),
                     "စုစုပေါင်း (MMK)": grand_total,
-                    "ပေးချေမှု": totals_data.get("payment_method", "Cash")
+                    "ပေးချေမှု": totals_data.get("payment_type", "Cash")
                 })
             except Exception:
                 continue
@@ -64,14 +68,13 @@ def show_profit_loss():
     # 4. Display Metrics
     net_profit = total_sales - total_cost
     col1, col2, col3 = st.columns(3)
-    col1.metric("💰 ရောင်းရငွေ (Sales)", f"{total_sales:,.0f} {APP_SETTINGS['currency']}")
-    col2.metric("📉 ကုန်ကျစရိတ် (Cost)", f"{total_cost:,.0f} {APP_SETTINGS['currency']}")
-    col3.metric("📊 အမြတ် (Profit)", f"{net_profit:,.0f} {APP_SETTINGS['currency']}")
+    col1.metric("💰 ရောင်းရငွေ (Sales)", f"{total_sales:,.0f} {APP_SETTINGS.get('currency', 'MMK')}")
+    col2.metric("📉 ကုန်ကျစရိတ် (Cost)", f"{total_cost:,.0f} {APP_SETTINGS.get('currency', 'MMK')}")
+    col3.metric("📊 အမြတ် (Profit)", f"{net_profit:,.0f} {APP_SETTINGS.get('currency', 'MMK')}")
 
     st.markdown("---")
     st.write("### 📝 အရောင်းမှတ်တမ်းအသေးစိတ်")
     
-    # 5. Display Table
     if filtered_sales:
         df = pd.DataFrame(filtered_sales)
         st.dataframe(df, use_container_width=True)
