@@ -55,23 +55,21 @@ def process_sale_stock_update(cart):
 
 def sync_to_supabase(pending_sales):
     """
-    Offline မှရရှိသော Pending Sales များအားလုံးကို Cloud သို့ တင်ပေးခြင်း
-    pending_sales သည် List တစ်ခုဖြစ်သည်
+    pending_sales ဆိုတဲ့ List တစ်ခုကို လက်ခံယူပြီး 
+    Database ထဲကို တစ်ခုချင်းစီ ထည့်ပေးခြင်း
     """
     if not supabase: raise Exception("Database Connection မရှိပါ။")
     
-    # ဤနေရာတွင် loop ပတ်ပြီး တစ်ခုချင်းစီကို database (sales table) ထဲ ထည့်ခြင်း
+    # pending_sales ဆိုတာက သင်အရောင်းလုပ်တုန်းက 
+    # st.session_state.pending_sales ထဲ ထည့်ထားတဲ့ list ဖြစ်ပါတယ်
     for sale in pending_sales:
-        try:
-            # sale ဆိုသည်မှာ dict တစ်ခုဖြစ်သည်
-            # insert_sale function ကို ခေါ်သုံးပါ
-            insert_sale(
-                sale['cart'], 
-                sale['totals'], 
-                sale['rec_no'], 
-                sale['payment_method'], 
-                sale['customer']
-            )
+        insert_sale(
+            sale['cart'], 
+            sale['totals'], 
+            sale['rec_no'], 
+            sale['payment_method'], 
+            sale['customer']
+        )
         except Exception as e:
             print(f"Sync error for receipt {sale.get('rec_no')}: {e}")
             continue # တစ်ခု error တက်ရင် နောက်တစ်ခု ဆက်လုပ်မည်
