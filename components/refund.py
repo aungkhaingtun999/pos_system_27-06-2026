@@ -1,9 +1,16 @@
 import streamlit as st
 import json
+import sys
+import os
 from components.supabase_logic import supabase, execute_refund
 
 def show_refund():
     st.title("🔄 Refund Manager")
+
+    # Session State ရှင်းလင်းခြင်း
+    if "msg" in st.session_state and st.session_state.msg:
+        st.success(st.session_state.msg)
+        st.session_state.msg = None
 
     # Database မှ Data ဆွဲယူခြင်း
     try:
@@ -13,48 +20,54 @@ def show_refund():
         st.error(f"Database Error: {e}")
         return
     
-    # ပြေစာ ရွေးချယ်မှု
-    options = {f"📄 {r.get('receipt_no')}": r for r in sales_data}
+    options = {f"📄 {r.get('receipt_no')} {'[REFUNDED]' if r.get('status') == 'refunded' else ''}": r for r in sales_data}
     selected = st.selectbox("🔍 Select Receipt to Refund:", [""] + list(options.keys()))
+    
     inv = options.get(selected) if selected else None
 
     if inv:
-        # ၁။ Status စစ်ဆေးခြင်း (Refund လုပ်ပြီးသားလား)
         if inv.get('status') == 'refunded':
             st.error("⚠️ ဤပြေစာအား Refund လုပ်ပြီးသားဖြစ်၍ ထပ်မံလုပ်ဆောင်၍ မရပါ။")
-            return
+        else:
+            st.subheader(f"📋 Items in {inv.get('receipt_no')}")
+            items = json.loads(inv.get('item', '[]')) if isinstance(inv.get('item'), str) else inv.get('item', [])
 
-        raw_items = inv.get('item', '[]')
-        items = json.loads(raw_items) if isinstance(raw_items, str) else raw_items
-        
-        st.subheader(f"📋 Items in {inv.get('receipt_no')}")
-        
-        selected_refund_items = []
-        total_refund_value = 0.0
-        
-        for i, item in enumerate(items):
-            price = float(item.get('sell_price') or item.get('price') or 0)
-            qty = int(item.get('qty', 1))
-            
-            if st.checkbox(f"{item.get('product_name', 'Item')} | Qty: {qty} | Price: {price:,.0f} MMK", key=f"chk_{i}"):
-                selected_refund_items.append(item)
-                total_refund_value += (price * qty)
-        
-        st.write(f"### 💰 Total Refund Amount: {total_refund_value:,.2f} MMK")
-        
-        if st.button("⚠️ Confirm Process Refund"):
-            if not selected_refund_items:
-                st.warning("အနည်းဆုံး Item တစ်ခု ရွေးပေးပါ။")
-            else:
-                try:
-                    # ၂။ ထပ်မံစစ်ဆေးခြင်း (Atomic Check)
-                    check = supabase.table("sales").select("status").eq("id", inv['id']).single().execute().data
-                    if check and check.get("status") == 'refunded':
-                        st.error("❌ ဤပြေစာကို Refund လုပ်ပြီးသွားပါပြီ။")
+            # --- Form စတင်ခြင်း ---
+            with st.form("refund_form"):
+                selected_refund_items = []
+                total_refund_value = 0
+                
+                for i, item in enumerate(items):
+                    price = float(item.get('sell_price') or item.get('price') or 0)
+                    qty = int(item.get('qty', 1))
+                    
+                    col1, col2, col3 = st.columns([0.5, 0.25, 0.25])
+                    if col1.checkbox(f"{item.get('product_name', 'Item')}", key=f"chk_{i}"):
+                        selected_refund_items.append(item)
+                        total_refund_value += (price * qty)
+                    col2.write(f"Qty: {qty}")
+                    col3.write(f"Price: {price:,.0f}")
+                
+                st.write(f"### 💰 Total: {total_refund_value:,.2f} MMK")
+                
+                # --- submit_button သည် with block အတွင်းတွင်သာ ရှိရမည် ---
+                submitted = st.form_submit_button("⚠️ Confirm Process Refund")
+                
+                if submitted:
+                    if not selected_refund_items:
+                        st.warning("Please select at least one item.")
                     else:
-                        # Refund လုပ်ဆောင်ခြင်း
-                        processed = execute_refund(inv, selected_refund_items)
-                        st.success(f"✅ Refund {processed:,.2f} MMK processed!")
-                        st.rerun()
-                except Exception as e:
-                    st.error(f"Refund Error: {e}")
+                        try:
+                            # နောက်ဆုံးတစ်ကြိမ် DB စစ်ခြင်း
+                            check = supabase.table("sales").select("status").eq("id", inv['id']).single().execute().data
+                            if check and check.get("status") == "refunded":
+                                st.error("❌ ဤပြေစာကို Refund လုပ်ပြီးသားပါ။")
+                            else:
+                                processed = execute_refund(inv, selected_refund_items)
+                                st.session_state.msg = f"✅ Refund {processed:,.2f} MMK processed!"
+                                st.rerun() 
+                        except Exception as e:
+                            st.error(f"Refund Error: {e}")
+
+-------------------------------------------------------
+----------------------------------------------------------------------------------------
