@@ -6,8 +6,11 @@ def show_refund():
     st.title("🔄 Refund Manager")
 
     # 1. State ရှင်းလင်းခြင်း
+    if "current_refund_inv" not in st.session_state: 
+        st.session_state.current_refund_inv = None
     if "msg" not in st.session_state: 
         st.session_state.msg = None
+
     if st.session_state.msg:
         st.success(st.session_state.msg)
         st.session_state.msg = None
@@ -23,20 +26,18 @@ def show_refund():
     # 3. Selection UI
     options = {f"📄 {r.get('receipt_no')} {'[REFUNDED]' if r.get('status') == 'refunded' else ''}": r for r in sales_data}
     
-    # ရွေးချယ်မှုအတွက် Key တစ်ခုခုကို အမြဲ reset ချနိုင်ရန် လုပ်ဆောင်ခြင်း
     selected = st.selectbox("🔍 Select Receipt to Refund:", [""] + list(options.keys()))
     
     if selected == "":
         st.session_state.current_refund_inv = None
     else:
-        # Receipt ပြောင်းလိုက်တိုင်း State ကို အသစ် update လုပ်ပါ
         st.session_state.current_refund_inv = options[selected]
 
     inv = st.session_state.current_refund_inv
     
     # 4. Refund Process
     if inv:
-        # [အရေးကြီး] Database မှ နောက်ဆုံး status ကို တိုက်ရိုက်ပြန်စစ်ပါ (Cache မသုံးပါ)
+        # Database မှ နောက်ဆုံး status ကို တိုက်ရိုက်ပြန်စစ်ပါ
         check_status = supabase.table("sales").select("status").eq("id", inv['id']).single().execute().data
         
         if check_status and check_status.get('status') == 'refunded':
@@ -50,11 +51,32 @@ def show_refund():
 
             with st.form("refund_form"):
                 selected_refund_items = []
+                total_refund_value = 0
+                
+                # Header row
+                c1, c2, c3, c4 = st.columns([0.4, 0.2, 0.2, 0.2])
+                c1.write("**Item**")
+                c2.write("**Qty**")
+                c3.write("**Price**")
+                c4.write("**Total**")
+
                 for i, item in enumerate(items):
-                    is_checked = st.checkbox(f"{item.get('product_name', 'Item')} (x{item.get('qty')})", key=f"chk_{i}")
+                    price = float(item.get('sell_price') or item.get('price') or 0)
+                    qty = int(item.get('qty', 1))
+                    item_total = price * qty
+                    
+                    col1, col2, col3, col4 = st.columns([0.4, 0.2, 0.2, 0.2])
+                    is_checked = col1.checkbox(f"{item.get('product_name', 'Item')}", key=f"chk_{i}")
+                    col2.write(f"{qty}")
+                    col3.write(f"{price:,.0f}")
+                    col4.write(f"{item_total:,.0f}")
+                    
                     if is_checked:
                         selected_refund_items.append(item)
+                        total_refund_value += item_total
                 
+                st.write("---")
+                st.write(f"### 💰 Total Refund Amount: {total_refund_value:,.2f} MMK")
                 submitted = st.form_submit_button("⚠️ Confirm Process Refund")
                 
                 if submitted:
@@ -62,17 +84,13 @@ def show_refund():
                         st.warning("Please select at least one item.")
                     else:
                         try:
-                            # [Logic] execute_refund ထဲတွင် တင်းကျပ်သော Check ပါပြီးသားဖြစ်သည်
                             processed_amount = execute_refund(inv, selected_refund_items)
-                            
-                            # အောင်မြင်ပါက State အားလုံးကို ရှင်းလင်းပြီးမှ Rerun လုပ်ပါ
                             st.session_state.msg = f"✅ Refund of {processed_amount:,.2f} MMK processed successfully!"
                             st.session_state.current_refund_inv = None
                             st.rerun()
                         except Exception as e:
                             st.error(f"Refund Error: {e}")
 
-        # Close button
         if st.button("❌ Close"):
             st.session_state.current_refund_inv = None
             st.rerun()
