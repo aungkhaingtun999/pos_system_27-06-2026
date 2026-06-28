@@ -1,27 +1,28 @@
+# app.py ၏ အပေါ်ပိုင်း import အပိုင်းကို ဤသို့ပြောင်းပါ
 import sys
 import os
 import streamlit as st
 
-# Root directory ကို Path ထဲသို့ သေချာထည့်ခြင်း
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-# Auth & Config
+# အရေးကြီးသော module များ
 from auth import check_password, init_auth_state
 from utils import init_app_state
 from config import init_session
 
-# Components Import များ
-from components.sidebar import show_sidebar
-from components.pos_system import show_pos_system
-from components.reports import show_reports
-from components.inventory import show_inventory
-from components.profit_loss import show_profit_loss
-from components.refund import show_refund
-from components.receipt import show_receipt # show_receipt အတွက် import ထည့်ပေးရန် လိုအပ်သည်
-
-# Supabase Logic Import
-from components.supabase_logic import insert_sale, sync_to_supabase
-
+# Component များ import လုပ်ရာတွင် Error စစ်ဆေးခြင်း
+try:
+    from components.sidebar import show_sidebar
+    from components.pos_system import show_pos_system
+    from components.reports import show_reports
+    from components.inventory import show_inventory
+    from components.profit_loss import show_profit_loss
+    from components.refund import show_refund
+    from components.receipt import show_receipt
+    from components.supabase_logic import insert_sale, sync_to_supabase
+except Exception as e:
+    st.error(f"Module Import Error: {e}")
+    st.stop()
 def setup_page():
     st.set_page_config(
         page_title="Barcode POS System", 
