@@ -3,37 +3,26 @@ import socket
 import sys
 import os
 
-# Root folder ကို ရှာဖွေပြီး path ထဲကို ထည့်ခြင်း
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.append(parent_dir)
+# ==========================================
+# PATH SETUP
+# ==========================================
+# sidebar.py သည် components folder ထဲတွင် ရှိနေသောကြောင့် 
+# Root folder ကို ရှာဖွေပြီး path ထဲသို့ ထည့်ခြင်း
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(CURRENT_DIR)
 
-# Imports - ဤနေရာတွင် 'components.' ကို ဖြုတ်လိုက်ပါ
-from auth import logout, change_password
-from language import get_text
-from components.supabase_logic import sync_to_supabase
-# --- Imports ---
-from auth import logout, change_password
-from language import get_text
-# အရေးကြီး: sys.path ထဲတွင် root_dir ရှိနေပြီဖြစ်သောကြောင့် 
-# 'components.supabase_logic' ဟု ခေါ်နိုင်ပါပြီ
-# အဟောင်း (Error ဖြစ်နေတာ)
-# from components.supabase_logic import sync_to_supabase
-
-# အသစ် (ဤသို့ပြင်ပါ)
-from .supabase_logic import sync_to_supabase
-# အဟောင်း (Error တက်နေတာ)
-# from components.supabase_logic import sync_to_supabase
-
-# အသစ် (ဤသို့သာ ရေးပါ)
-from supabase_logic import sync_to_supabase
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
 
 # ==========================================
 # IMPORTS
 # ==========================================
 from auth import logout, change_password
 from language import get_text
+
+# အရေးကြီးဆုံးပြင်ဆင်ချက်: 
+# components folder အတွင်းမှ module ကိုခေါ်ရန် 'components.' ကို အသုံးပြုပါ
+# sys.path ထဲတွင် ROOT_DIR ရှိနေပြီဖြစ်သောကြောင့် ဤနည်းလမ်းသည် မှန်ကန်ပါသည်
 from components.supabase_logic import sync_to_supabase
 
 # ==========================================
