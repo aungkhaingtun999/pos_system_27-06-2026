@@ -19,7 +19,6 @@ try:
     from components.profit_loss import show_profit_loss
     from components.refund import show_refund
     from components.receipt import show_receipt
-    # Supabase Logic Import
     from components.supabase_logic import insert_sale, sync_to_supabase
 except Exception as e:
     st.error(f"Module Import Error: {e}")
@@ -32,27 +31,20 @@ def setup_page():
         initial_sidebar_state="expanded"
     )
 
-# app.py ၏ Import အပိုင်း (ပြင်ဆင်ချက်)
-try:
-    from components.supabase_logic import insert_sale, sync_to_supabase
-except Exception as e:
-    st.error(f"Module Import Error: {e}")
-    st.stop()
-
-# app.py ၏ auto_sync_on_start function (ပြင်ဆင်ချက်)
 def auto_sync_on_start():
-    pending_data = st.session_state.get("pending_sales", [])
-    
-    if pending_data:
+    """App စဖွင့်ချိန်တွင် Pending Sales များကို Cloud သို့ Sync လုပ်ခြင်း"""
+    if "pending_sales" in st.session_state and st.session_state.pending_sales:
         with st.spinner("🌐 Cloud နှင့် ချိတ်ဆက်နေသည်..."):
             try:
-                # နာမည်အဟောင်း sync_to_supabase ကို ပြန်သုံးပါ
-                sync_to_supabase(pending_data)
+                # sync_to_supabase သည် supabase_logic.py တွင် သေချာရေးထားရမည်
+                sync_to_supabase(st.session_state.pending_sales)
                 
+                # အောင်မြင်ပါက ရှင်းလင်းပါ
                 st.session_state.pending_sales = []
                 st.success("✅ အားလုံး Sync လုပ်ပြီးပါပြီ။")
             except Exception as e:
-                st.warning(f"Sync အဆင်မပြေပါ: {e}")# ... (ကျန်တဲ့ run_router နှင့် main function များသည် ယခင်အတိုင်းပင်) ...
+                st.warning(f"Sync အဆင်မပြေပါ: {e}")
+
 def run_router():
     """Menu ရွေးချယ်မှုအလိုက် Page ပြောင်းလဲခြင်း"""
     menu_map = {
