@@ -7,8 +7,8 @@ from products import get_products_cached
 from cart import add_to_cart, remove_from_cart, calculate_total
 
 # အရေးကြီးဆုံးပြင်ဆင်ချက် - components လမ်းကြောင်းကို အပြည့်အစုံထည့်ပါ
-from components.supabase_logic import process_sale_stock_update, insert_sale_to_supabase, supabase
-
+# components/pos_system.py ရဲ့ အပေါ်ဆုံးမှာ
+from components.supabase_logic import process_sale_stock_update, insert_sale, supabase
 # ==========================================
 # 1. Helper Functions
 # ==========================================
