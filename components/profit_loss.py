@@ -13,15 +13,19 @@ def show_profit_loss():
     end_date = col_b.date_input("End Date", value=datetime.now().date())
 
     try:
+        # Data ဆွဲယူခြင်း
         sales_data = supabase.table("sales").select("*").execute().data or []
         products_data = supabase.table("products").select("*").execute().data or []
+        expenses_data = supabase.table("expenses").select("*").execute().data or []
+        
         product_map = {str(p.get('barcode')): p for p in products_data}
     except Exception as e:
         st.error(f"Database Error: {e}")
         return
 
+    # 1. Sales & Cost Calculation
     total_sales = 0
-    total_cost = 0
+    total_cogs = 0 # Cost of Goods Sold (ပစ္စည်းဝယ်ဈေး)
     total_tax = 0
     total_discount = 0
     filtered_sales = []
@@ -33,18 +37,15 @@ def show_profit_loss():
                 items = json.loads(sale.get('item', '[]'))
                 totals = json.loads(sale.get('totals', '{}'))
                 
-                # Sales values
                 grand_total = float(totals.get("grand_total", 0))
                 total_sales += grand_total
                 total_tax += float(totals.get("tax", 0))
                 total_discount += float(totals.get("discount", 0))
                 
-                # Cost Calculation (Buy Price မှ တွက်ချက်)
                 for item in items:
                     prod = product_map.get(str(item.get('barcode')), {})
-                    # cost_price သို့မဟုတ် buy_price ကို စစ်ဆေးယူပါ
                     buy_price = float(prod.get('cost_price') or prod.get('buy_price') or 0)
-                    total_cost += (buy_price * int(item.get('qty', 1)))
+                    total_cogs += (buy_price * int(item.get('qty', 1)))
                 
                 filtered_sales.append({
                     "ပြေစာအမှတ်": sale.get('receipt_no'),
@@ -53,17 +54,32 @@ def show_profit_loss():
                 })
             except: continue
 
-    # Net Profit = Sales - Cost - Discount - Tax
+    # 2. Operating Expenses Calculation
+    total_expenses = 0
+    for ex in expenses_data:
+        ex_date = pd.to_datetime(ex.get('date')).date()
+        if start_date <= ex_date <= end_date:
+            total_expenses += float(ex.get('amount', 0))
+
+    # Net Profit Calculation
+    # Net Profit = Sales - COGS - Expenses - Discount - Tax
+    total_cost = total_cogs + total_expenses
     net_profit = total_sales - total_cost - total_discount - total_tax
 
     # Display Metrics
     st.subheader(f"📊 Summary ({start_date} to {end_date})")
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("💰 ရောင်းရငွေ", f"{total_sales:,.0f}")
-    c2.metric("📉 ကုန်ကျစရိတ်", f"{total_cost:,.0f}")
-    c3.metric("🏷️ Discount/Tax", f"{(total_discount + total_tax):,.0f}")
+    c2.metric("📉 ကုန်ပစ္စည်းဝယ်ဈေး", f"{total_cogs:,.0f}")
+    c3.metric("🛠️ လည်ပတ်မှုစရိတ်", f"{total_expenses:,.0f}")
     c4.metric("🎯 အသားတင်အမြတ်", f"{net_profit:,.0f}")
 
+    # Discount/Tax breakdown
+    st.info(f"မှတ်ချက်။ ။ Discount/Tax စုစုပေါင်းမှာ { (total_discount + total_tax):,.0f} ဖြစ်ပါသည်။")
+
     st.write("---")
+    st.write("### 📝 အရောင်းမှတ်တမ်းအသေးစိတ်")
     if filtered_sales:
         st.dataframe(pd.DataFrame(filtered_sales), use_container_width=True)
+    else:
+        st.warning("ရွေးချယ်ထားသော ရက်စွဲများအတွင်း အရောင်းမှတ်တမ်း မရှိပါ။")
