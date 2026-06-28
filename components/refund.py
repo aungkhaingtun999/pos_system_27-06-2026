@@ -1,57 +1,70 @@
 import streamlit as st
 import json
-from supabase import create_client
-from datetime import datetime
-import pytz
+import sys
+import os
+from components.supabase_logic import supabase, execute_refund
 
-# Supabase Client
-@st.cache_resource
-def _get_client():
-    url = st.secrets.get("SUPABASE_URL")
-    key = st.secrets.get("SUPABASE_KEY")
-    return create_client(url, key) if url and key else None
+def show_refund():
+    st.title("🔄 Refund Manager")
 
-supabase = _get_client()
+    # Session State ရှင်းလင်းခြင်း
+    if "msg" in st.session_state and st.session_state.msg:
+        st.success(st.session_state.msg)
+        st.session_state.msg = None
 
-def sync_to_supabase(pending_sales):
-    """Sync logic: pending_sales (list) ကို အတိအကျ လက်ခံသည်"""
-    if not supabase: raise Exception("Database Connection မရှိပါ။")
-    for sale in pending_sales:
-        # insert_sale function ကို ခေါ်ခြင်း
-        data = {
-            "receipt_no": sale['rec_no'],
-            "customer_name": sale['customer'],
-            "grand_total": float(sale['totals'].get("grand_total", 0)),
-            "payment_type": sale['payment_method'],
-            "created_at": datetime.now(pytz.timezone('Asia/Yangon')).isoformat(),
-            "item": json.dumps(sale['cart'], ensure_ascii=False),
-            "totals": json.dumps(sale['totals'], ensure_ascii=False),
-            "status": "active"
-        }
-        supabase.table("sales").insert(data).execute()
-
-def execute_refund(inv, items_to_refund):
-    """Refund Logic: Double Check ဖြင့် Refund လုပ်သည်"""
-    if not supabase: return 0
+    # Database မှ Data ဆွဲယူခြင်း
+    try:
+        response = supabase.table("sales").select("*").order("id", desc=True).execute()
+        sales_data = response.data if response.data else []
+    except Exception as e:
+        st.error(f"Database Error: {e}")
+        return
     
-    # 1. DB မှ နောက်ဆုံး status ကို စစ်ခြင်း
-    check = supabase.table("sales").select("status").eq("id", inv['id']).single().execute().data
-    if check and check.get("status") == "refunded":
-        raise Exception("⚠️ ဤပြေစာအား Refund လုပ်ပြီးသားဖြစ်၍ ထပ်မံလုပ်ဆောင်၍ မရပါ။")
+    options = {f"📄 {r.get('receipt_no')} {'[REFUNDED]' if r.get('status') == 'refunded' else ''}": r for r in sales_data}
+    selected = st.selectbox("🔍 Select Receipt to Refund:", [""] + list(options.keys()))
+    
+    inv = options.get(selected) if selected else None
 
-    # 2. Status update လုပ်ခြင်း
-    supabase.table("sales").update({"status": "refunded"}).eq("id", inv['id']).execute()
-    
-    total_refunded = sum([float(item.get('price', 0)) * int(item.get('qty', 1)) for item in items_to_refund])
-    
-    # 3. Refund table သို့ ထည့်ခြင်း
-    refund_data = {
-        "receipt_no": inv.get('receipt_no'),
-        "items": json.dumps(items_to_refund, ensure_ascii=False),
-        "refund_amount": float(total_refunded),
-        "refunded_at": datetime.now(pytz.timezone('Asia/Yangon')).isoformat(),
-        "status": "completed",
-        "details": f"Refunded {len(items_to_refund)} items"
-    }
-    supabase.table("refunds").insert(refund_data).execute()
-    return total_refunded
+    if inv:
+        if inv.get('status') == 'refunded':
+            st.error("⚠️ ဤပြေစာအား Refund လုပ်ပြီးသားဖြစ်၍ ထပ်မံလုပ်ဆောင်၍ မရပါ။")
+        else:
+            st.subheader(f"📋 Items in {inv.get('receipt_no')}")
+            items = json.loads(inv.get('item', '[]')) if isinstance(inv.get('item'), str) else inv.get('item', [])
+
+            # --- Form စတင်ခြင်း ---
+            with st.form("refund_form"):
+                selected_refund_items = []
+                total_refund_value = 0
+                
+                for i, item in enumerate(items):
+                    price = float(item.get('sell_price') or item.get('price') or 0)
+                    qty = int(item.get('qty', 1))
+                    
+                    col1, col2, col3 = st.columns([0.5, 0.25, 0.25])
+                    if col1.checkbox(f"{item.get('product_name', 'Item')}", key=f"chk_{i}"):
+                        selected_refund_items.append(item)
+                        total_refund_value += (price * qty)
+                    col2.write(f"Qty: {qty}")
+                    col3.write(f"Price: {price:,.0f}")
+                
+                st.write(f"### 💰 Total: {total_refund_value:,.2f} MMK")
+                
+                # --- submit_button သည် with block အတွင်းတွင်သာ ရှိရမည် ---
+                submitted = st.form_submit_button("⚠️ Confirm Process Refund")
+                
+                if submitted:
+                    if not selected_refund_items:
+                        st.warning("Please select at least one item.")
+                    else:
+                        try:
+                            # နောက်ဆုံးတစ်ကြိမ် DB စစ်ခြင်း
+                            check = supabase.table("sales").select("status").eq("id", inv['id']).single().execute().data
+                            if check and check.get("status") == "refunded":
+                                st.error("❌ ဤပြေစာကို Refund လုပ်ပြီးသားပါ။")
+                            else:
+                                processed = execute_refund(inv, selected_refund_items)
+                                st.session_state.msg = f"✅ Refund {processed:,.2f} MMK processed!"
+                                st.rerun() 
+                        except Exception as e:
+                            st.error(f"Refund Error: {e}")
