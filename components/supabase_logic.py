@@ -47,21 +47,14 @@ def process_sale_stock_update(cart):
     for item in cart:
         barcode = str(item.get("barcode"))
         qty = int(item.get("qty", 0))
-        
         product = supabase.table("products").select("stock_qty").eq("barcode", barcode).single().execute().data
         if product:
             new_stock = int(product.get("stock_qty", 0)) - qty
             supabase.table("products").update({"stock_qty": new_stock}).eq("barcode", barcode).execute()
 
 def sync_to_supabase(pending_sales):
-    """
-    pending_sales ဆိုတဲ့ List တစ်ခုကို လက်ခံယူပြီး 
-    Database ထဲကို တစ်ခုချင်းစီ ထည့်ပေးခြင်း
-    """
+    """Offline မှရရှိသော Pending Sales များအားလုံးကို Cloud သို့ တင်ပေးခြင်း"""
     if not supabase: raise Exception("Database Connection မရှိပါ။")
-    
-    # pending_sales ဆိုတာက သင်အရောင်းလုပ်တုန်းက 
-    # st.session_state.pending_sales ထဲ ထည့်ထားတဲ့ list ဖြစ်ပါတယ်
     for sale in pending_sales:
         insert_sale(
             sale['cart'], 
@@ -70,30 +63,22 @@ def sync_to_supabase(pending_sales):
             sale['payment_method'], 
             sale['customer']
         )
-        except Exception as e:
-            print(f"Sync error for receipt {sale.get('rec_no')}: {e}")
-            continue # တစ်ခု error တက်ရင် နောက်တစ်ခု ဆက်လုပ်မည်
 
 # ==========================================
 # 3. Optimized Refund Function
 # ==========================================
 def execute_refund(inv, items_to_refund):
-    """
-    Refund လုပ်ဆောင်ချက် - Atomic Locking ဖြင့် တည်ဆောက်ထားသည်
-    """
+    """Refund လုပ်ဆောင်ချက် - Atomic Locking ဖြင့် တည်ဆောက်ထားသည်"""
     if not supabase: return 0
     
-    # [Step 1]: Database မှ လက်ရှိ status ကို နောက်ဆုံးတစ်ကြိမ် တိုက်ရိုက်စစ်ပါ
     latest_check = supabase.table("sales").select("status").eq("id", inv['id']).single().execute().data
     if latest_check and latest_check.get("status") == "refunded":
         raise Exception("⚠️ ဤပြေစာအား Refund လုပ်ပြီးသားဖြစ်၍ ထပ်မံလုပ်ဆောင်၍ မရပါ။")
 
-    # [Step 2 - CRITICAL]: Refund မစခင် status ကို 'refunded' အရင်ပြောင်းထားပါ (Locking)
     supabase.table("sales").update({"status": "refunded"}).eq("id", inv['id']).execute()
 
     try:
         total_refunded = 0
-        # [Step 3]: Stock ပြန်တိုးခြင်း
         for item in items_to_refund:
             barcode = str(item.get('barcode'))
             qty = int(item.get('qty', 0))
@@ -106,7 +91,6 @@ def execute_refund(inv, items_to_refund):
             price = float(item.get('sell_price') or item.get('price') or 0)
             total_refunded += (price * qty)
         
-        # [Step 4]: Refund Log သိမ်းခြင်း
         refund_data = {
             "receipt_no": inv.get('receipt_no'),
             "items": json.dumps(items_to_refund, ensure_ascii=False),
@@ -115,7 +99,6 @@ def execute_refund(inv, items_to_refund):
             "details": f"Refunded {len(items_to_refund)} items"
         }
         supabase.table("refunds").insert(refund_data).execute()
-        
         return total_refunded
 
     except Exception as e:
