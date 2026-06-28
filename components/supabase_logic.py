@@ -21,6 +21,7 @@ def _get_client():
     if not url or not key: return None
     return create_client(url, key)
 
+# Database client ကို တစ်ကြိမ်သာ ခေါ်ယူခြင်း
 supabase = _get_client()
 
 # ==========================================
@@ -58,10 +59,19 @@ def find_by_barcode(barcode):
 def update_product_stock(barcode, new_stock):
     if not supabase: return
     supabase.table("products").update({"stock_qty": int(new_stock)}).eq("barcode", barcode).execute()
+    # Cache အားလုံးကိုရှင်းလင်းပြီး Stock အမှန်ရစေရန်
     st.cache_data.clear()
 
+def process_sale_stock_update(cart):
+    for item in cart:
+        barcode = str(item.get("barcode"))
+        product = find_by_barcode(barcode)
+        if product:
+            new_stock = int(product.get("stock_qty", 0)) - int(item.get("qty", 0))
+            update_product_stock(barcode, new_stock)
+
 # ==========================================
-# 4. Refund Functions (Cleaned)
+# 4. Refund Functions
 # ==========================================
 def execute_refund(inv, items_to_refund):
     """
@@ -70,7 +80,7 @@ def execute_refund(inv, items_to_refund):
     if not supabase: return 0
     total_refunded = 0
     
-    # Stock ပြန်တိုးခြင်းနှင့် တန်ဖိုးတွက်ချက်ခြင်း
+    # 1. Stock ပြန်တိုးခြင်းနှင့် တန်ဖိုးတွက်ချက်ခြင်း
     for item in items_to_refund:
         barcode = str(item.get('barcode'))
         qty = int(item.get('qty', 0))
@@ -83,17 +93,19 @@ def execute_refund(inv, items_to_refund):
         price = float(item.get('sell_price') or item.get('price') or 0)
         total_refunded += (price * qty)
     
-    # Refund table ထဲသို့ အသေးစိတ် သိမ်းဆည်းခြင်း
+    # 2. Refund table ထဲသို့ သိမ်းဆည်းခြင်း
     refund_data = {
         "receipt_no": inv.get('receipt_no'),
         "items": json.dumps(items_to_refund, ensure_ascii=False),
         "refund_amount": float(total_refunded),
         "refunded_at": get_myanmar_time().isoformat(),
-        "details": f"Refunded {len(items_to_refund)} items" # log_refund မှ details ကို ဒီနေရာတွင် ပေါင်းထည့်လိုက်သည်
+        "details": f"Refunded {len(items_to_refund)} items"
     }
     supabase.table("refunds").insert(refund_data).execute()
     
-    # Sales Receipt ကို 'refunded' ဟု အမှတ်အသားပြုခြင်း
-    supabase.table("sales").update({"status": "refunded"}).eq("id", inv['id']).execute()
+    # 3. Sales Receipt ကို 'refunded' ဟု အမှတ်အသားပြုခြင်း
+    # inv['id'] မမှန်လျှင် Error တက်နိုင်သဖြင့် ကြိုတင်စစ်ဆေးပါ
+    if inv and 'id' in inv:
+        supabase.table("sales").update({"status": "refunded"}).eq("id", inv['id']).execute()
     
     return total_refunded
