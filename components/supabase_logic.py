@@ -462,54 +462,44 @@ def execute_refund(
 
 
         # ==========================================
-        # 5. Update Sales Status
-        # ==========================================
+# Update Sales Status
+# ==========================================
 
-        update_result = (
-
-            supabase
-            .table("sales")
-            .update(
-
-                {
-
-                    "status":
-                        "refunded"
-
-                }
-
-            )
-            .eq(
-                "id",
-                invoice_id
-            )
-            .execute()
-
-        )
+supabase.table(
+    "sales"
+).update(
+    {
+        "status": "refunded"
+    }
+).eq(
+    "id",
+    inv["id"]
+).execute()
 
 
-
-        if not update_result.data:
-
-
-            raise Exception(
-                "Sales Status Update မအောင်မြင်ပါ"
-            )
-
-
-
-
-
-
-        return refund_amount
+# Verify only
+verify = (
+    supabase
+    .table("sales")
+    .select("status")
+    .eq(
+        "id",
+        inv["id"]
+    )
+    .single()
+    .execute()
+)
 
 
+if not verify.data:
+
+    raise Exception(
+        "Sales record မတွေ့ပါ"
+    )
 
 
+if verify.data.get("status") != "refunded":
 
-    except Exception as e:
-
-
-        raise Exception(
-            f"Refund Failed : {str(e)}"
-        )
+    raise Exception(
+        "Sales Status Update မအောင်မြင်ပါ"
+    )
