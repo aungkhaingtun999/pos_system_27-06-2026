@@ -3,27 +3,14 @@ import socket
 import sys
 import os
 
-# ==========================================
-# PATH SETUP
-# ==========================================
-# sidebar.py သည် components folder ထဲတွင် ရှိနေသောကြောင့် 
-# Root folder ကို ရှာဖွေပြီး path ထဲသို့ ထည့်ခြင်း
+# PATH SETUP: Root folder ကို path ထဲသို့ အတင်းထည့်ခြင်း
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
-
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
-# ==========================================
-# IMPORTS
-# ==========================================
 from auth import logout, change_password
 from language import get_text
-
-# အရေးကြီးဆုံးပြင်ဆင်ချက်: 
-# components folder အတွင်းမှ module ကိုခေါ်ရန် 'components.' ကို အသုံးပြုပါ
-# sys.path ထဲတွင် ROOT_DIR ရှိနေပြီဖြစ်သောကြောင့် ဤနည်းလမ်းသည် မှန်ကန်ပါသည်
-from components.supabase_logic import sync_to_supabase
 
 # ==========================================
 # INTERNET CHECK
@@ -36,89 +23,61 @@ def _check_internet():
         return False
 
 # ==========================================
-# MENU CHANGE
-# ==========================================
-def _handle_menu_change(selected_menu):
-    st.session_state.menu = selected_menu
-    try:
-        st.query_params["menu"] = selected_menu
-    except Exception:
-        pass
-    st.rerun()
-
-# ==========================================
 # SIDEBAR UI
 # ==========================================
 def show_sidebar():
-    # Session Defaults
-    if "lang" not in st.session_state:
-        st.session_state.lang = "MY"
-    if "menu" not in st.session_state:
-        st.session_state.menu = "POS System"
+    if "lang" not in st.session_state: st.session_state.lang = "MY"
+    if "menu" not in st.session_state: st.session_state.menu = "POS System"
 
     with st.sidebar:
-        # --- STATUS AREA ---
+        # Status Area
         col1, col2 = st.columns([1, 1])
         with col1:
-            if _check_internet():
-                st.success("🟢 Online")
-            else:
-                st.error("🔴 Offline")
+            st.success("🟢 Online") if _check_internet() else st.error("🔴 Offline")
         with col2:
             lang_options = ["MY", "EN"]
-            current_lang = st.session_state.lang
-            selected_lang = st.selectbox("🌐", lang_options, index=lang_options.index(current_lang), label_visibility="collapsed")
-            if selected_lang != current_lang:
+            selected_lang = st.selectbox("🌐", lang_options, index=lang_options.index(st.session_state.lang), label_visibility="collapsed")
+            if selected_lang != st.session_state.lang:
                 st.session_state.lang = selected_lang
                 st.rerun()
 
         st.divider()
 
-        # --- USER INFO ---
-        username = st.session_state.get("username", "User")
-        role = st.session_state.get("user_role", "Cashier")
-        st.info(f"👤 **{username}**\n\n🛡️ Role : **{role}**")
-
-        # --- SYNC DATA ---
+        # Sync Data (ဒီနေရာမှာ Local Import လုပ်ခြင်းဖြင့် အမှားကင်းစေသည်)
         if st.button("🔄 Sync Data Now", key="sync_btn", use_container_width=True):
             if _check_internet():
                 try:
+                    from components.supabase_logic import sync_to_supabase
                     with st.spinner("Syncing..."):
                         sync_to_supabase()
                     st.success("✅ Sync Complete")
                 except Exception as e:
-                    st.error(f"❌ Sync Failed\n\n{e}")
+                    st.error(f"❌ Sync Failed: {e}")
             else:
                 st.warning("⚠️ No Internet Connection")
 
         st.divider()
 
-        # --- ROLE MENU ---
+        # Role Menu
+        role = st.session_state.get("user_role", "Cashier")
         menu_items = ["POS System"]
-        if role in ["Admin", "Inventory Manager"]:
-            menu_items.append("Inventory")
-        if role == "Admin":
-            menu_items.extend(["Reports", "Profit & Loss", "User Management"])
+        if role in ["Admin", "Inventory Manager"]: menu_items.append("Inventory")
+        if role == "Admin": menu_items.extend(["Reports", "Profit & Loss", "User Management"])
         menu_items.append("Refund")
 
         current_menu = st.session_state.menu
-        if current_menu not in menu_items:
-            current_menu = "POS System"
-            st.session_state.menu = current_menu
+        if current_menu not in menu_items: current_menu = "POS System"
 
-        selected_menu = st.radio(
-            "📌 Main Menu",
-            menu_items,
-            index=menu_items.index(current_menu),
-            key="main_menu_radio"
-        )
-
+        selected_menu = st.radio("📌 Main Menu", menu_items, index=menu_items.index(current_menu), key="main_menu_radio")
         if selected_menu != current_menu:
-            _handle_menu_change(selected_menu)
+            st.session_state.menu = selected_menu
+            try: st.query_params["menu"] = selected_menu
+            except: pass
+            st.rerun()
 
         st.divider()
 
-        # --- PASSWORD CHANGE ---
+        # Password & Logout
         if st.button("🔑 Change Password", key="chg_pwd", use_container_width=True):
             st.session_state.show_pwd_change = True
 
@@ -129,6 +88,5 @@ def show_sidebar():
                     st.session_state.show_pwd_change = False
                     st.rerun()
 
-        # --- LOGOUT ---
         if st.button("🚪 Log Out", key="logout_btn", use_container_width=True):
             logout()
