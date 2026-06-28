@@ -32,19 +32,21 @@ def setup_page():
     )
 
 def auto_sync_on_start():
-    """App စဖွင့်ချိန်တွင် Pending Sales များကို Cloud သို့ Sync လုပ်ခြင်း"""
-    if "pending_sales" in st.session_state and st.session_state.pending_sales:
+    """App စဖွင့်သည်နှင့် Internet ရှိပါက Pending Sales များကို Cloud သို့ Sync လုပ်ခြင်း"""
+    # session_state ထဲက pending_sales ကို အရင်ယူပါ
+    pending_data = st.session_state.get("pending_sales", [])
+    
+    if pending_data:
         with st.spinner("🌐 Cloud နှင့် ချိတ်ဆက်နေသည်..."):
             try:
-                # sync_to_supabase သည် supabase_logic.py တွင် သေချာရေးထားရမည်
-                sync_to_supabase(st.session_state.pending_sales)
+                # ဤနေရာတွင် pending_data ကို Argument အနေဖြင့် ထည့်ပေးရပါမည်
+                sync_to_supabase(pending_data)
                 
-                # အောင်မြင်ပါက ရှင်းလင်းပါ
+                # အောင်မြင်သွားလျှင် List ကို ရှင်းလင်းခြင်း
                 st.session_state.pending_sales = []
                 st.success("✅ အားလုံး Sync လုပ်ပြီးပါပြီ။")
             except Exception as e:
-                st.warning(f"Sync အဆင်မပြေပါ: {e}")
-
+                st.warning(f"အင်တာနက် အားနည်းနေ၍ Sync မအောင်မြင်ပါ။ ({e})")
 def run_router():
     """Menu ရွေးချယ်မှုအလိုက် Page ပြောင်းလဲခြင်း"""
     menu_map = {
