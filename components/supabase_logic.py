@@ -2,7 +2,9 @@ import streamlit as st
 import json
 from supabase import create_client
 from datetime import datetime
-from .supabase_logic import process_sale_stock_update, insert_sale_to_supabase, supabase
+# components/pos_system.py ၏ ထိပ်ပိုင်းတွင်
+# အောက်ပါအတိုင်းသာ ရေးပါ (from .supabase_logic မသုံးပါနဲ့)
+from components.supabase_logic import process_sale_stock_update, insert_sale_to_supabase, supabase
 # ==========================================
 # 1. Connection Initialization
 # ==========================================
