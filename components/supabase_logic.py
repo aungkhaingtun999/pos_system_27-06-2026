@@ -6,12 +6,12 @@ import pytz
 
 # Supabase Client
 @st.cache_resource
-def _get_client():
+def get_supabase_client():
     url = st.secrets.get("SUPABASE_URL")
     key = st.secrets.get("SUPABASE_KEY")
     return create_client(url, key) if url and key else None
 
-supabase = _get_client()
+supabase = get_supabase_client()
 
 def sync_to_supabase(pending_sales):
     """Sync logic: pending_sales (list) ကို အတိအကျ လက်ခံသည်"""
