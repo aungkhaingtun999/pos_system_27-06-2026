@@ -3,3 +3,4 @@ supabase
 pandas
 pillow
 reportlab
+requirements.txt
