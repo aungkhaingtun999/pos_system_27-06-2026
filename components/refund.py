@@ -5,34 +5,43 @@ from components.supabase_logic import supabase, execute_refund
 def show_refund():
     st.title("🔄 Refund Manager")
 
-    # Session State စစ်ဆေးခြင်း
-    if "current_refund_inv" not in st.session_state: st.session_state.current_refund_inv = None
-    if "msg" not in st.session_state: st.session_state.msg = None
+    # Session State ရှင်းလင်းခြင်း
+    if "current_refund_inv" not in st.session_state: 
+        st.session_state.current_refund_inv = None
+    if "msg" not in st.session_state: 
+        st.session_state.msg = None
 
     if st.session_state.msg:
         st.success(st.session_state.msg)
         st.session_state.msg = None
 
-    # Fetching latest sales data
+    # [အရေးကြီး] Database မှ Data အသစ်ကို အမြဲပြန်ဆွဲယူခြင်း
     try:
-        sales_data = supabase.table("sales").select("*").order("id", desc=True).execute().data or []
+        response = supabase.table("sales").select("*").order("id", desc=True).execute()
+        sales_data = response.data if response.data else []
     except Exception as e:
         st.error(f"Database Error: {e}")
         return
     
-    # Selection Menu (Refunded ဖြစ်ပြီးသားကို အချက်အလက်နှင့်အတူပြသ)
+    # Selection Menu
     options = {f"📄 {r.get('receipt_no')} {'[REFUNDED]' if r.get('status') == 'refunded' else ''}": r for r in sales_data}
+    
+    # ရွေးချယ်မှုအတွက် UI
     selected = st.selectbox("🔍 Select Receipt to Refund:", [""] + list(options.keys()))
     
     if selected:
+        # ရွေးလိုက်သည့် Receipt ကို State တွင် သိမ်းခြင်း
         st.session_state.current_refund_inv = options[selected]
     
     inv = st.session_state.current_refund_inv
     
     if inv:
-        # [ பாதுகாப்பு ] Refunded ဖြစ်ပြီးသားကို ထပ်မလုပ်ရအောင် ပိတ်ပင်ခြင်း
-        if inv.get('status') == 'refunded':
-            st.error("⚠️ ဤပြေစာသည် ယခင်ကပင် Refund လုပ်ပြီးသားဖြစ်ပါသည်။ ထပ်မံလုပ်ဆောင်၍ မရပါ။")
+        # [ பாதுகாப்பு ] Database မှ နောက်ဆုံး Status ကို ပြန်စစ်ခြင်း
+        # (State အဟောင်းကြောင့် အမှားမဖြစ်စေရန်)
+        latest_inv = supabase.table("sales").select("status").eq("id", inv['id']).single().execute().data
+        
+        if latest_inv and latest_inv.get('status') == 'refunded':
+            st.error("⚠️ ဤပြေစာသည် ယခင်ကပင် Refund လုပ်ပြီးသားဖြစ်ပါသည်။")
             if st.button("ပြန်လည်ရွေးချယ်မည်"):
                 st.session_state.current_refund_inv = None
                 st.rerun()
@@ -66,10 +75,8 @@ def show_refund():
                         st.warning("Please select at least one item.")
                     else:
                         try:
-                            # [Logic] execute_refund ထဲတွင် Stock ပြန်ထည့်ခြင်း၊ Refund မှတ်တမ်းတင်ခြင်း
-                            # နှင့် status ကို 'refunded' ပြောင်းခြင်းတို့ကို တစ်ပါတည်း လုပ်ဆောင်ပါမည်
+                            # [Logic] Refund လုပ်ဆောင်ခြင်း
                             processed_amount = execute_refund(inv, selected_refund_items)
-                            
                             st.session_state.msg = f"✅ Refund of {processed_amount:,.2f} MMK processed successfully!"
                             st.session_state.current_refund_inv = None
                             st.rerun()
