@@ -32,22 +32,29 @@ def setup_page():
         initial_sidebar_state="expanded"
     )
 
+# app.py ၏ Import အပိုင်း
+# ... (အခြား imports) ...
+from components.supabase_logic import insert_sale, sync_pending_data  # နာမည်အသစ်ပြောင်းပါ
+
+# ... (setup_page) ...
+
 def auto_sync_on_start():
-    # Session ထဲက pending_sales ကိုယူပါ (မရှိရင် empty list)
+    # Session ထဲက pending_sales ကိုယူပါ
     pending_data = st.session_state.get("pending_sales", [])
     
     if pending_data:
         with st.spinner("🌐 Cloud နှင့် ချိတ်ဆက်နေသည်..."):
             try:
-                # ဤနေရာတွင် pending_data ကို Argument အနေဖြင့် ထည့်ပါ
-                sync_to_supabase(pending_data)
+                # နာမည်အသစ်ဖြင့် ခေါ်ပါ
+                sync_pending_data(pending_data)
                 
                 # အောင်မြင်ပါက ရှင်းလင်းပါ
                 st.session_state.pending_sales = []
                 st.success("✅ အားလုံး Sync လုပ်ပြီးပါပြီ။")
             except Exception as e:
-                # Error ကို ပိုရှင်းအောင် ပြပါ
                 st.warning(f"Sync အဆင်မပြေပါ: {e}")
+
+# ... (ကျန်တဲ့ run_router နှင့် main function များသည် ယခင်အတိုင်းပင်) ...
 def run_router():
     """Menu ရွေးချယ်မှုအလိုက် Page ပြောင်းလဲခြင်း"""
     menu_map = {
