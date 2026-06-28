@@ -21,57 +21,10 @@ def _get_client():
     if not url or not key: return None
     return create_client(url, key)
 
-# Database client ကို Export လုပ်ပေးခြင်း
 supabase = _get_client()
 
 # ==========================================
-# 2. Refund Function (Transactional Logic)
-# ==========================================
-def execute_refund(inv, items_to_refund):
-    """
-    Refund လုပ်ဆောင်ချက်များကို တစ်စုတစ်စည်းတည်း လုပ်ဆောင်ပေးသည်။
-    """
-    if not supabase: return 0
-    
-    # [Step 1] Status အရင်စစ် (Double-check)
-    # Cache မသုံးဘဲ Database မှ အမှန်တကယ် Status ကို စစ်ဆေးပါ
-    check = supabase.table("sales").select("status").eq("id", inv['id']).single().execute().data
-    if check and check.get("status") == "refunded":
-        raise Exception("ဤပြေစာအား Refund လုပ်ပြီးသားဖြစ်၍ ထပ်မံလုပ်ဆောင်၍ မရပါ။")
-
-    total_refunded = 0
-    
-    # [Step 2] Stock ပြန်တိုးခြင်းနှင့် တန်ဖိုးတွက်ချက်ခြင်း
-    for item in items_to_refund:
-        barcode = str(item.get('barcode'))
-        qty = int(item.get('qty', 0))
-        
-        # Product ကို Database မှ အသစ်ပြန်ခေါ် (Cache မသုံးပါ)
-        product = supabase.table("products").select("stock_qty").eq("barcode", barcode).single().execute().data
-        if product:
-            new_stock = int(product.get("stock_qty", 0)) + qty
-            supabase.table("products").update({"stock_qty": new_stock}).eq("barcode", barcode).execute()
-            
-        price = float(item.get('sell_price') or item.get('price') or 0)
-        total_refunded += (price * qty)
-    
-    # [Step 3] Refund table ထဲသို့ သိမ်းဆည်းခြင်း
-    refund_data = {
-        "receipt_no": inv.get('receipt_no'),
-        "items": json.dumps(items_to_refund, ensure_ascii=False),
-        "refund_amount": float(total_refunded),
-        "refunded_at": get_myanmar_time().isoformat(),
-        "details": f"Refunded {len(items_to_refund)} items"
-    }
-    supabase.table("refunds").insert(refund_data).execute()
-    
-    # [Step 4] Sales Receipt ကို 'refunded' ဟု အမှတ်အသားပြုခြင်း
-    supabase.table("sales").update({"status": "refunded"}).eq("id", inv['id']).execute()
-    
-    return total_refunded
-
-# ==========================================
-# 3. Sale Functions (အခြားနေရာတွင်သုံးရန်)
+# 2. Sale Functions
 # ==========================================
 def insert_sale(cart, totals, receipt_no, payment_method, customer_name):
     if not supabase: raise Exception("Database Connection မရှိပါ။")
@@ -86,3 +39,66 @@ def insert_sale(cart, totals, receipt_no, payment_method, customer_name):
         "status": "active" 
     }
     return supabase.table("sales").insert(data).execute()
+
+def process_sale_stock_update(cart):
+    """
+    Sale လုပ်သည့်အခါ Stock ကို အလိုအလျောက် နုတ်ပေးခြင်း
+    """
+    if not supabase: return
+    for item in cart:
+        barcode = str(item.get("barcode"))
+        qty = int(item.get("qty", 0))
+        
+        # Database မှ လက်ရှိ stock_qty ကို ရယူခြင်း
+        product = supabase.table("products").select("stock_qty").eq("barcode", barcode).single().execute().data
+        if product:
+            new_stock = int(product.get("stock_qty", 0)) - qty
+            supabase.table("products").update({"stock_qty": new_stock}).eq("barcode", barcode).execute()
+
+# ==========================================
+# 3. Refund Function
+# ==========================================
+def execute_refund(inv, items_to_refund):
+    """
+    Refund လုပ်ဆောင်ချက်-
+    1. Status အရင်စစ် (Double-check)
+    2. Stock ပြန်တိုး
+    3. Refund Log သွင်း
+    4. Sale Status ပြောင်း
+    """
+    if not supabase: return 0
+    
+    # [Step 1] Status အရင်စစ်
+    check = supabase.table("sales").select("status").eq("id", inv['id']).single().execute().data
+    if check and check.get("status") == "refunded":
+        raise Exception("ဤပြေစာအား Refund လုပ်ပြီးသားဖြစ်၍ ထပ်မံလုပ်ဆောင်၍ မရပါ။")
+
+    total_refunded = 0
+    
+    # [Step 2] Stock ပြန်တိုးခြင်း
+    for item in items_to_refund:
+        barcode = str(item.get('barcode'))
+        qty = int(item.get('qty', 0))
+        
+        product = supabase.table("products").select("stock_qty").eq("barcode", barcode).single().execute().data
+        if product:
+            new_stock = int(product.get("stock_qty", 0)) + qty
+            supabase.table("products").update({"stock_qty": new_stock}).eq("barcode", barcode).execute()
+            
+        price = float(item.get('sell_price') or item.get('price') or 0)
+        total_refunded += (price * qty)
+    
+    # [Step 3] Refund Log သိမ်းခြင်း
+    refund_data = {
+        "receipt_no": inv.get('receipt_no'),
+        "items": json.dumps(items_to_refund, ensure_ascii=False),
+        "refund_amount": float(total_refunded),
+        "refunded_at": get_myanmar_time().isoformat(),
+        "details": f"Refunded {len(items_to_refund)} items"
+    }
+    supabase.table("refunds").insert(refund_data).execute()
+    
+    # [Step 4] Sales Receipt ကို 'refunded' ဟု အမှတ်အသားပြုခြင်း
+    supabase.table("sales").update({"status": "refunded"}).eq("id", inv['id']).execute()
+    
+    return total_refunded
