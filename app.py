@@ -32,6 +32,7 @@ def setup_page():
         initial_sidebar_state="expanded"
     )
 
+# app.py ၏ Import အပိုင်း (ပြင်ဆင်ချက်)
 try:
     from components.supabase_logic import insert_sale, sync_to_supabase
 except Exception as e:
@@ -51,8 +52,7 @@ def auto_sync_on_start():
                 st.session_state.pending_sales = []
                 st.success("✅ အားလုံး Sync လုပ်ပြီးပါပြီ။")
             except Exception as e:
-                st.warning(f"Sync အဆင်မပြေပါ: {e}")
-# ... (ကျန်တဲ့ run_router နှင့် main function များသည် ယခင်အတိုင်းပင်) ...
+                st.warning(f"Sync အဆင်မပြေပါ: {e}")# ... (ကျန်တဲ့ run_router နှင့် main function များသည် ယခင်အတိုင်းပင်) ...
 def run_router():
     """Menu ရွေးချယ်မှုအလိုက် Page ပြောင်းလဲခြင်း"""
     menu_map = {
