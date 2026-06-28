@@ -42,10 +42,23 @@ def safe_float(value):
 
 def show_refund():
 
-
     st.title(
         "🔄 Refund Manager"
     )
+
+
+    # ==========================================
+    # SUCCESS MESSAGE
+    # ==========================================
+
+    if "refund_success" in st.session_state:
+
+        st.success(
+            st.session_state["refund_success"]
+        )
+
+        del st.session_state["refund_success"]
+
 
 
 
@@ -56,7 +69,6 @@ def show_refund():
     try:
 
         response = (
-
             supabase
             .table("sales")
             .select("*")
@@ -65,7 +77,6 @@ def show_refund():
                 desc=True
             )
             .execute()
-
         )
 
 
@@ -73,7 +84,6 @@ def show_refund():
 
 
     except Exception as e:
-
 
         st.error(
             f"Database Error : {e}"
@@ -87,7 +97,6 @@ def show_refund():
 
     if not sales_data:
 
-
         st.info(
             "Sales record မရှိပါ"
         )
@@ -99,9 +108,8 @@ def show_refund():
 
 
     # ==========================================
-    # SELECT RECEIPT
+    # RECEIPT SELECT
     # ==========================================
-
 
     options = {}
 
@@ -110,9 +118,7 @@ def show_refund():
 
 
         label = (
-
             f"📄 {sale.get('receipt_no')}"
-
         )
 
 
@@ -144,7 +150,6 @@ def show_refund():
 
 
 
-
     inv = options[selected]
 
 
@@ -152,17 +157,14 @@ def show_refund():
 
 
     # ==========================================
-    # BLOCK REFUNDED RECEIPT
+    # BLOCK ALREADY REFUNDED
     # ==========================================
-
 
     if inv.get("status") == "refunded":
 
 
         st.error(
-
             "⚠️ ဒီ Receipt ကို Refund လုပ်ပြီးသားဖြစ်ပါသည်။"
-
         )
 
         return
@@ -175,7 +177,6 @@ def show_refund():
     # LOAD ITEMS
     # ==========================================
 
-
     raw_items = inv.get(
         "item",
         []
@@ -185,16 +186,13 @@ def show_refund():
 
     try:
 
-
         if isinstance(raw_items, str):
 
             items = json.loads(raw_items)
 
-
         else:
 
             items = raw_items
-
 
 
     except:
@@ -228,13 +226,11 @@ def show_refund():
 
 
 
-
     # ==========================================
     # ITEM LIST
     # ==========================================
 
-
-    for i,item in enumerate(items):
+    for i, item in enumerate(items):
 
 
         qty = int(
@@ -282,8 +278,8 @@ def show_refund():
 
 
 
-        col1,col2,col3 = st.columns(
-            [0.5,0.25,0.25]
+        col1, col2, col3 = st.columns(
+            [0.5, 0.25, 0.25]
         )
 
 
@@ -302,31 +298,25 @@ def show_refund():
 
 
         col2.write(
-
             f"Qty : {qty}"
-
         )
 
 
         col3.write(
-
             f"{price:,.0f} MMK"
-
         )
+
 
 
 
 
         if checked:
 
-
             selected_items.append(item)
 
 
             refund_total += (
-
                 qty * price
-
             )
 
 
@@ -334,7 +324,6 @@ def show_refund():
 
 
     st.divider()
-
 
 
     st.subheader(
@@ -347,11 +336,9 @@ def show_refund():
 
 
 
-
     # ==========================================
     # CONFIRM REFUND
     # ==========================================
-
 
     if st.button(
 
@@ -362,33 +349,23 @@ def show_refund():
     ):
 
 
-
         if not selected_items:
 
-
             st.warning(
-
                 "Item ရွေးပါ"
-
             )
 
             return
-
-
 
 
 
         if refund_total <= 0:
 
-
             st.error(
-
                 "Refund Amount 0 ဖြစ်နေပါသည်"
-
             )
 
             return
-
 
 
 
@@ -409,16 +386,23 @@ def show_refund():
 
 
 
-            st.success(
+            # ==================================
+            # SUCCESS
+            # ==================================
 
-                f"✅ Refund {result:,.2f} MMK Completed"
+            st.session_state["refund_success"] = (
+
+                f"✅ Refund အောင်မြင်ပါသည်\n\n"
+
+                f"📄 Receipt : {inv.get('receipt_no')}\n"
+
+                f"💰 Amount : {result:,.2f} MMK"
 
             )
 
 
 
             st.rerun()
-
 
 
 
