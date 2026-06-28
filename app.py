@@ -33,16 +33,18 @@ def setup_page():
     )
 
 def auto_sync_on_start():
-    # pending_sales ရှိမရှိ စစ်ဆေးပါ
+    """App စဖွင့်သည်နှင့် Internet ရှိပါက Pending Sales များကို Cloud သို့ Sync လုပ်ခြင်း"""
+    # 1. pending_sales ရှိမရှိ စစ်ဆေးပါ
     if "pending_sales" in st.session_state and st.session_state.pending_sales:
         with st.spinner("🌐 Cloud နှင့် ချိတ်ဆက်နေသည်..."):
             try:
-                # ဤနေရာတွင် () အတွင်း၌ data ထည့်ပေးလိုက်ပါ
+                # 2. ဒီနေရာမှာ st.session_state.pending_sales ဆိုတဲ့ data ကို ထည့်ပေးရပါမယ်
+                # ဒါမှသာ supabase_logic.py ထဲက sync_to_supabase(pending_sales) က အလုပ်လုပ်မှာပါ
                 sync_to_supabase(st.session_state.pending_sales)
                 
-                # အောင်မြင်ရင် pending_sales ကို ရှင်းပစ်ပါ
+                # 3. Sync အောင်မြင်ရင် စာရင်းကို ရှင်းလင်းပေးပါ
                 st.session_state.pending_sales = []
-                st.success("✅ Sync အောင်မြင်ပါသည်။")
+                st.success("✅ အားလုံး Sync လုပ်ပြီးပါပြီ။")
             except Exception as e:
                 st.warning(f"Sync Failed: {e}")
 def run_router():
