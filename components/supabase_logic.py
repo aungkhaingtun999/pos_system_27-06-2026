@@ -27,6 +27,7 @@ supabase = _get_client()
 # 2. Sale Functions
 # ==========================================
 def insert_sale(cart, totals, receipt_no, payment_method, customer_name):
+    """Database သို့ Sales အသစ်ထည့်ခြင်း"""
     if not supabase: raise Exception("Database Connection မရှိပါ။")
     data = {
         "receipt_no": receipt_no,
@@ -40,26 +41,24 @@ def insert_sale(cart, totals, receipt_no, payment_method, customer_name):
     }
     return supabase.table("sales").insert(data).execute()
 
-def process_sale_stock_update(cart):
-    if not supabase: return
-    for item in cart:
-        barcode = str(item.get("barcode"))
-        qty = int(item.get("qty", 0))
-        product = supabase.table("products").select("stock_qty").eq("barcode", barcode).single().execute().data
-        if product:
-            new_stock = int(product.get("stock_qty", 0)) - qty
-            supabase.table("products").update({"stock_qty": new_stock}).eq("barcode", barcode).execute()
+def sync_to_supabase(pending_sales):
+    """Offline မှရရှိသော Pending Sales များအားလုံးကို Cloud သို့ တင်ပေးခြင်း"""
+    if not supabase: raise Exception("Database Connection မရှိပါ။")
+    for sale in pending_sales:
+        insert_sale(
+            sale['cart'], 
+            sale['totals'], 
+            sale['rec_no'], 
+            sale['payment_method'], 
+            sale['customer']
+        )
 
 # ==========================================
-# 3. Optimized Refund Function (Fixed)
+# 3. Optimized Refund Function
 # ==========================================
 def execute_refund(inv, items_to_refund):
     """
-    Refund လုပ်ဆောင်ချက်-
-    1. [Atomic Check] Status အရင်စစ်
-    2. [Locking] Status ကို 'refunded' ချက်ချင်းပြောင်း (အကြိမ်ကြိမ်လုပ်၍မရအောင်)
-    3. Stock ပြန်တိုး
-    4. Refund Log သွင်း
+    Refund လုပ်ဆောင်ချက် - Atomic Locking ဖြင့် တည်ဆောက်ထားသည်
     """
     if not supabase: return 0
     
@@ -69,7 +68,6 @@ def execute_refund(inv, items_to_refund):
         raise Exception("⚠️ ဤပြေစာအား Refund လုပ်ပြီးသားဖြစ်၍ ထပ်မံလုပ်ဆောင်၍ မရပါ။")
 
     # [Step 2 - CRITICAL]: Refund မစခင် status ကို 'refunded' အရင်ပြောင်းထားပါ (Locking)
-    # ဤအဆင့်က အခြား process များမှ ထပ်မံ Refund လုပ်ခြင်းကို တားဆီးပေးမည်
     supabase.table("sales").update({"status": "refunded"}).eq("id", inv['id']).execute()
 
     try:
@@ -100,6 +98,5 @@ def execute_refund(inv, items_to_refund):
         return total_refunded
 
     except Exception as e:
-        # အကယ်၍ အမှားတစ်ခုခုဖြစ်ခဲ့လျှင် status ကို ပြန်ဖွင့်ပေးရန် လိုအပ်ပါက ဤနေရာတွင် logic ထည့်ပါ
-        # သို့သော် များသောအားဖြင့် status ကို 'refunded' အဖြစ်ထားခဲ့ခြင်းက ပို၍လုံခြုံသည်
+        # လုပ်ငန်းစဉ်တစ်ခုခုမှားယွင်းလျှင် Error ပြန်တက်စေရန်
         raise Exception(f"Refund လုပ်ဆောင်စဉ် အမှားဖြစ်ပွားသည်: {e}")
