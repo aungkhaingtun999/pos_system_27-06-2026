@@ -1,10 +1,13 @@
 import streamlit as st
 import json
-from datetime import datetime
-import pytz
-
-# Database client (သင့်ဆီမှာရှိပြီးသားအတိုင်း)
-from components.supabase_logic import supabase 
+# တိုက်ရိုက် import လုပ်မည့်အစား အပေါ်တွင် သေချာစစ်ဆေးပါ
+try:
+    from components.supabase_logic import supabase, execute_refund
+except ImportError:
+    # အကယ်၍ package မတွေ့ပါက path ထည့်ပေးခြင်း
+    import sys, os
+    sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+    from components.supabase_logic import supabase, execute_refund
 
 def execute_refund(inv, items_to_refund):
     """
