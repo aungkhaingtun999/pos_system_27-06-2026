@@ -27,7 +27,11 @@ def _get_client():
 
 supabase = _get_client()
 
-def _clear_cache():
+# ဥပမာ - Product update လုပ်တဲ့နေရာမှာသာ ခေါ်ပါ
+def update_product_stock(barcode, new_stock):
+    if not supabase: return
+    supabase.table("products").update({"stock_qty": int(new_stock)}).eq("barcode", barcode).execute()
+    # ဒီနေရာမှာပဲ ခေါ်ပါ၊ တခြားနေရာမှာ မခေါ်ပါနဲ့
     st.cache_data.clear()
 
 # ==========================================
