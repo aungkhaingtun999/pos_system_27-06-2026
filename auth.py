@@ -2,27 +2,25 @@ import streamlit as st
 import re
 from supabase import create_client
 
-# Supabase Client Initialize
-url = st.secrets["SUPABASE_URL"]
-key = st.secrets["SUPABASE_KEY"]
-supabase = create_client(url, key)
+# Supabase Client Initialize (Secrets မှ တိုက်ရိုက်ခေါ်ခြင်း)
+@st.cache_resource
+def get_supabase_client():
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    return create_client(url, key)
+
+supabase = get_supabase_client()
 
 # ==========================================
 # 1. Login Logic
 # ==========================================
 def get_user_from_db(username, password):
-    """Username ကိုရှာပြီး Python ဘက်တွင် Password တိုက်စစ်ခြင်း"""
     if not username or not password:
         return None
-        
     try:
-        # Username တူတာကို အရင်ရှာပါ
         response = supabase.table("users").select("*").eq("username", str(username).strip()).execute()
-        
-        # User တွေ့ရှိပါက
         if response.data and len(response.data) > 0:
             user = response.data[0]
-            # Database password နှင့် ရိုက်ထည့်တဲ့ password တိုက်စစ်ပါ
             if str(user.get("password", "")).strip() == str(password).strip():
                 return user
         return None
@@ -61,17 +59,15 @@ def check_password():
     return True
 
 # ==========================================
-# 3. Security Helper (Password ပြောင်းရန်)
+# 3. Security Helper
 # ==========================================
 def is_strong(password):
-    # အနည်းဆုံး 8 လုံး၊ အကြီး၊ အသေး၊ ဂဏန်း ပါဝင်ရမည်
     return len(password) >= 8 and \
            re.search("[A-Z]", password) and \
            re.search("[a-z]", password) and \
            re.search("[0-9]", password)
 
 def update_password_db(username, old_password, new_password):
-    """Password အသစ်ပြောင်းခြင်း"""
     user = get_user_from_db(username, old_password)
     if user:
         try:
@@ -82,11 +78,10 @@ def update_password_db(username, old_password, new_password):
     return False
 
 def change_password():
-    """Password Change UI"""
     st.write("#### 🔑 Change Password")
-    old_p = st.text_input("Old Password", type="password")
-    new_p = st.text_input("New Password", type="password")
-    conf_p = st.text_input("Confirm New Password", type="password")
+    old_p = st.text_input("Old Password", type="password", key="old_p")
+    new_p = st.text_input("New Password", type="password", key="new_p")
+    conf_p = st.text_input("Confirm New Password", type="password", key="conf_p")
     
     if st.button("Update Password"):
         if new_p != conf_p:
@@ -96,7 +91,7 @@ def change_password():
         elif update_password_db(st.session_state.username, old_p, new_p):
             st.success("✅ Password အောင်မြင်စွာ ပြောင်းလဲပြီးပါပြီ။")
         else:
-            st.error("⚠️ Password ပြောင်းလဲရန် မအောင်မြင်ပါ။ (Old Password မှားနေနိုင်သည်)")
+            st.error("⚠️ Password ပြောင်းလဲရန် မအောင်မြင်ပါ။")
 
 def logout():
     st.session_state.logged_in = False
