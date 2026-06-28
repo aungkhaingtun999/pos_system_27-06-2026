@@ -1,13 +1,20 @@
 import streamlit as st
 import json
 from supabase import create_client
+# supabase_logic.py ထဲမှာ ဒီလိုဖြစ်နေရပါမယ်
 from datetime import datetime
-import pytz  # လိုအပ်သော library
+import pytz
 
-# မြန်မာစံတော်ချိန် သတ်မှတ်ခြင်း
 def get_myanmar_time():
     myanmar_tz = pytz.timezone('Asia/Yangon')
     return datetime.now(myanmar_tz)
+
+# insert_sale_to_supabase ထဲမှာ
+data = {
+    # ...
+    "created_at": get_myanmar_time().isoformat(), # ဒီနေရာမှာ မြန်မာအချိန်ကို သိမ်းတာပါ
+    # ...
+}
 # ==========================================
 # 1. Connection Initialization
 # ==========================================
