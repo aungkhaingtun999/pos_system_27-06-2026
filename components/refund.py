@@ -34,6 +34,7 @@ def show_refund():
 
             # --- Form စတင်ခြင်း ---
             with st.form("refund_form"):
+                # Checkbox များ၏ State ကို သိမ်းဆည်းရန်အတွက် session_state တွင် ခေတ္တသိမ်းပါ
                 selected_refund_items = []
                 total_refund_value = 0
                 
@@ -42,15 +43,18 @@ def show_refund():
                     qty = int(item.get('qty', 1))
                     
                     col1, col2, col3 = st.columns([0.5, 0.25, 0.25])
+                    # Checkbox အမှန်ခြစ်ကို ဖမ်းယူခြင်း
                     if col1.checkbox(f"{item.get('product_name', 'Item')}", key=f"chk_{i}"):
                         selected_refund_items.append(item)
                         total_refund_value += (price * qty)
                     col2.write(f"Qty: {qty}")
                     col3.write(f"Price: {price:,.0f}")
                 
-                st.write(f"### 💰 Total: {total_refund_value:,.2f} MMK")
+                # လှပအောင် Display လုပ်ခြင်း
+                st.write("---")
+                st.write(f"### 💰 Total Refund Amount: {total_refund_value:,.2f} MMK")
                 
-                # --- submit_button သည် with block အတွင်းတွင်သာ ရှိရမည် ---
+                # --- Submit Button ---
                 submitted = st.form_submit_button("⚠️ Confirm Process Refund")
                 
                 if submitted:
@@ -58,11 +62,13 @@ def show_refund():
                         st.warning("Please select at least one item.")
                     else:
                         try:
-                            # နောက်ဆုံးတစ်ကြိမ် DB စစ်ခြင်း
+                            # 1. Double Verification: နောက်ဆုံးအကြိမ် DB စစ်ခြင်း
                             check = supabase.table("sales").select("status").eq("id", inv['id']).single().execute().data
+                            
                             if check and check.get("status") == "refunded":
-                                st.error("❌ ဤပြေစာကို Refund လုပ်ပြီးသားပါ။")
+                                st.error("❌ ဤပြေစာကို Refund လုပ်ပြီးသွားပါပြီ။")
                             else:
+                                # 2. Refund လုပ်ဆောင်ခြင်း
                                 processed = execute_refund(inv, selected_refund_items)
                                 st.session_state.msg = f"✅ Refund {processed:,.2f} MMK processed!"
                                 st.rerun() 
