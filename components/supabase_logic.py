@@ -49,7 +49,9 @@ def get_myanmar_time():
         pytz.timezone(
             "Asia/Yangon"
         )
-    ).isoformat()
+    ).strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
 
 
 
