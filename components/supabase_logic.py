@@ -39,7 +39,6 @@ supabase = get_supabase_client()
 
 
 
-
 # =====================================================
 # TIME
 # =====================================================
@@ -54,9 +53,8 @@ def get_myanmar_time():
 
 
 
-
 # =====================================================
-# SAFE FLOAT
+# NUMBER
 # =====================================================
 
 def safe_float(value):
@@ -91,7 +89,7 @@ def safe_float(value):
 # =====================================================
 
 def sync_to_supabase(
-        pending_sales
+        pending_sales=None
 ):
 
 
@@ -104,95 +102,123 @@ def sync_to_supabase(
 
     if not pending_sales:
 
-        return
+        return False
 
 
 
-    for sale in pending_sales:
+    if not isinstance(
+        pending_sales,
+        list
+    ):
 
-
-        data={
-
-
-            "receipt_no":
-                sale.get(
-                    "rec_no"
-                ),
-
-
-
-            "customer_name":
-                sale.get(
-                    "customer",
-                    ""
-                ),
+        raise Exception(
+            "Invalid sales data format"
+        )
 
 
 
-            "grand_total":
-                safe_float(
+    try:
 
-                    sale
-                    .get(
-                        "totals",
-                        {}
-                    )
-                    .get(
-                        "grand_total",
-                        0
-                    )
 
-                ),
+        for sale in pending_sales:
 
 
 
-            "payment_type":
-                sale.get(
-                    "payment_method",
-                    ""
-                ),
+            data={
 
 
-
-            "created_at":
-                get_myanmar_time(),
-
-
-
-            "item":
-                json.dumps(
+                "receipt_no":
                     sale.get(
-                        "cart",
-                        []
+                        "rec_no"
                     ),
-                    ensure_ascii=False
-                ),
 
 
 
-            "totals":
-                json.dumps(
+                "customer_name":
                     sale.get(
-                        "totals",
-                        {}
+                        "customer",
+                        ""
                     ),
-                    ensure_ascii=False
-                ),
 
 
 
-            "status":
-                "active"
+                "grand_total":
+                    safe_float(
 
-        }
+                        sale
+                        .get(
+                            "totals",
+                            {}
+                        )
+                        .get(
+                            "grand_total",
+                            0
+                        )
+
+                    ),
 
 
 
-        supabase.table(
-            "sales"
-        ).insert(
-            data
-        ).execute()
+                "payment_type":
+                    sale.get(
+                        "payment_method",
+                        ""
+                    ),
+
+
+
+                "created_at":
+                    get_myanmar_time(),
+
+
+
+                "item":
+                    json.dumps(
+                        sale.get(
+                            "cart",
+                            []
+                        ),
+                        ensure_ascii=False
+                    ),
+
+
+
+                "totals":
+                    json.dumps(
+                        sale.get(
+                            "totals",
+                            {}
+                        ),
+                        ensure_ascii=False
+                    ),
+
+
+
+                "status":
+                    "active"
+
+            }
+
+
+
+            supabase.table(
+                "sales"
+            ).insert(
+                data
+            ).execute()
+
+
+
+        return True
+
+
+
+    except Exception as e:
+
+
+        raise Exception(
+            f"Sync Failed : {e}"
+        )
 
 
 
@@ -200,7 +226,7 @@ def sync_to_supabase(
 
 
 # =====================================================
-# EXECUTE REFUND
+# REFUND
 # =====================================================
 
 def execute_refund(
@@ -217,16 +243,13 @@ def execute_refund(
         )
 
 
-
     try:
 
 
-        # =========================================
-        # 1. Double Check Status
-        # =========================================
 
+        # Status Check
 
-        check = (
+        check=(
 
             supabase
             .table(
@@ -261,52 +284,44 @@ def execute_refund(
 
 
             raise Exception(
-                "⚠️ ဤပြေစာအား Refund လုပ်ပြီးသားဖြစ်ပါသည်။"
+                "Already refunded"
             )
 
 
 
 
 
-        # =========================================
-        # 2. Calculate Refund Amount
-        # =========================================
-
+        # Calculate
 
         if refund_amount is None:
 
 
-            refund_amount = 0.0
-
+            refund_amount=0
 
 
             for item in items_to_refund:
 
 
-                qty = int(
-
+                qty=int(
                     item.get(
                         "qty",
                         1
                     )
-
                 )
 
 
-                sell_price = safe_float(
-
+                price=safe_float(
                     item.get(
                         "sell_price",
                         0
                     )
-
                 )
 
 
                 refund_amount += (
 
                     qty *
-                    sell_price
+                    price
 
                 )
 
@@ -314,20 +329,15 @@ def execute_refund(
 
 
 
-
-        # =========================================
-        # 3. Update Sales Status Only
-        # =========================================
+        # Update sales status
 
         supabase.table(
             "sales"
         ).update(
 
             {
-
                 "status":
                     "refunded"
-
             }
 
         ).eq(
@@ -340,21 +350,20 @@ def execute_refund(
 
 
 
+        # Insert refund history
 
 
-        # =========================================
-        # 4. Save Refund History
-        # =========================================
+        supabase.table(
+            "refunds"
+        ).insert(
 
-
-        refund_data={
+            {
 
 
             "receipt_no":
                 inv.get(
                     "receipt_no"
                 ),
-
 
 
             "items":
@@ -364,41 +373,22 @@ def execute_refund(
                 ),
 
 
-
             "refund_amount":
                 float(
                     refund_amount
                 ),
 
 
-
             "refunded_at":
                 get_myanmar_time(),
 
 
-
             "status":
-                "completed",
+                "completed"
 
+            }
 
-
-            "details":
-                (
-                    f"Refunded "
-                    f"{len(items_to_refund)} items"
-                )
-
-        }
-
-
-
-        supabase.table(
-            "refunds"
-        ).insert(
-            refund_data
         ).execute()
-
-
 
 
 
@@ -406,11 +396,9 @@ def execute_refund(
 
 
 
-
-
     except Exception as e:
 
 
         raise Exception(
-            f"Refund Failed: {str(e)}"
+            f"Refund Failed : {e}"
         )
