@@ -3,20 +3,19 @@ import json
 from supabase import create_client
 from datetime import datetime
 
-# ==========================================
-# 1. Connection Initialization
-# ==========================================
+# Import လုပ်ရန် မလိုပါ၊ ဤဖိုင်သည် အခြေခံကျသော Logic သာဖြစ်ရမည်
+# from components.refund ... သို့မဟုတ် အခြားမည်သည့် import မှ မထည့်ပါနှင့်
+
 @st.cache_resource
 def _get_client():
     url = st.secrets.get("SUPABASE_URL")
     key = st.secrets.get("SUPABASE_KEY")
-    if not url or not key:
-        return None
+    if not url or not key: return None
     return create_client(url, key)
 
-# supabase ကို module-level မှာတင် Define လုပ်ပါ
 supabase = _get_client()
 
+# ... (သင့် Function များဖြစ်သော insert_sale_to_supabase, execute_refund, log_refund အားလုံးကို ဤနေရာတွင် ဆက်ထားပါ) ...
 def _clear_cache():
     st.cache_data.clear()
 
