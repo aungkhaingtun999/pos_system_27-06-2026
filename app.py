@@ -20,16 +20,18 @@ from components.receipt import show_receipt
 def setup_page():
     st.set_page_config(page_title="Barcode POS System", layout="wide")
 
+# app.py အတွင်းရှိ Auto Sync function
 def auto_sync_on_start():
-    pending_data = st.session_state.get("pending_sales", [])
-    if pending_data:
-        try:
-            # နာမည်အသစ်ဖြင့် ခေါ်ခြင်း
-            supabase_logic.perform_full_sync(pending_data) 
-            st.session_state.pending_sales = []
-            st.success("✅ Cloud သို့ အားလုံး Sync လုပ်ပြီးပါပြီ။")
-        except Exception as e:
-            st.error(f"Sync Failed: {e}")
+    # Session ထဲတွင် pending_sales ရှိမရှိနှင့် list ဟုတ်မဟုတ် စစ်ဆေးပါ
+    if "pending_sales" in st.session_state and isinstance(st.session_state.pending_sales, list):
+        if len(st.session_state.pending_sales) > 0:
+            try:
+                # Import လုပ်ထားသော function ကို တိုက်ရိုက်သုံးပါ
+                sync_to_supabase(st.session_state.pending_sales)
+                st.session_state.pending_sales = []
+                st.success("✅ Sync လုပ်ပြီးပါပြီ။")
+            except Exception as e:
+                st.error(f"Sync အဆင်မပြေပါ: {e}")
 
 def main():
     setup_page()
