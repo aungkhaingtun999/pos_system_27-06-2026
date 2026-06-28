@@ -52,19 +52,21 @@ def process_sale_stock_update(cart):
             new_stock = int(product.get("stock_qty", 0)) - qty
             supabase.table("products").update({"stock_qty": new_stock}).eq("barcode", barcode).execute()
 
-def sync_to_supabase(pending_sales):
+# components/supabase_logic.py ထဲတွင် ဤအတိုင်း အစားထိုးပါ
+def perform_full_sync(pending_sales):
     """Offline မှရရှိသော Pending Sales များအားလုံးကို Cloud သို့ တင်ပေးခြင်း"""
+    if not pending_sales or not isinstance(pending_sales, list):
+        return
+    
     if not supabase: raise Exception("Database Connection မရှိပါ။")
     
-    # ဤနေရာတွင် loop ပတ်ပြီး တစ်ခုချင်းစီကို insert_sale ထံ ပေးပို့ခြင်း
     for sale in pending_sales:
-        # Dictionary ထဲမှ keys များ မှန်ကန်ကြောင်း သေချာပါစေ
         insert_sale(
-            sale['cart'], 
-            sale['totals'], 
-            sale['rec_no'], 
-            sale['payment_method'], 
-            sale['customer']
+            sale.get('cart'), 
+            sale.get('totals'), 
+            sale.get('rec_no'), 
+            sale.get('payment_method'), 
+            sale.get('customer')
         )
 # ==========================================
 # 3. Optimized Refund Function
