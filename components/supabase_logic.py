@@ -68,7 +68,7 @@ def sync_to_supabase(pending_sales):
             sale['payment_method'], 
             sale['customer']
         )
-# ==========================================
+        # ==========================================
 # 3. Optimized Refund Function
 # ==========================================
 def execute_refund(inv, items_to_refund):
