@@ -65,20 +65,19 @@ def show_refund():
                 st.write(f"### 💰 Total Refund Amount: {total_refund_value:,.2f} MMK")
                 
                 # Form အတွင်းမှာ submit button သုံးရပါမယ်
-                if st.form_submit_button("⚠️ Confirm Process Refund"):
-                    if not selected_refund_items:
-                        st.warning("Please select at least one item.")
-                    else:
-                        try:
-                            # 2. နောက်ဆုံးအကြိမ် Status ကို DB မှာ ထပ်စစ် (Double Verification)
-                            current_sale = supabase.table("sales").select("status").eq("id", inv['id']).single().execute().data
-                            
-                            if current_sale and current_sale.get("status") == "refunded":
-                                st.error("❌ ဤပြေစာကို Refund လုပ်ပြီးသွားပါပြီ။ Refresh လုပ်လိုက်ပါ။")
-                            else:
-                                # Refund လုပ်ဆောင်ခြင်း
-                                processed_amount = execute_refund(inv, selected_refund_items)
-                                st.session_state.msg = f"✅ Refund {processed_amount:,.2f} MMK processed!"
-                                st.rerun() 
-                        except Exception as e:
-                            st.error(f"Refund Error: {e}")
+                # components/refund.py ၏ st.form_submit_button အပိုင်း
+if st.form_submit_button("⚠️ Confirm Process Refund"):
+    # ၁။ Refund မလုပ်ခင် Database က status ကို နောက်ဆုံးတစ်ခါ ထပ်စစ်ပါ
+    latest_check = supabase.table("sales").select("status").eq("id", inv['id']).single().execute().data
+    
+    if latest_check and latest_check.get("status") == "refunded":
+        st.error("❌ ဤပြေစာကို Refund လုပ်ပြီးသွားပါပြီ။ ထပ်လုပ်၍ မရပါ။")
+        st.stop()
+    
+    # ၂။ အခြေအနေကောင်းမှသာ Refund ဆက်လုပ်ပါ
+    try:
+        processed_amount = execute_refund(inv, selected_refund_items)
+        st.session_state.msg = f"✅ Refund {processed_amount:,.2f} MMK processed!"
+        st.rerun() 
+    except Exception as e:
+        st.error(f"Refund Error: {e}")
