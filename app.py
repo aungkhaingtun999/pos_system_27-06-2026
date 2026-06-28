@@ -23,20 +23,23 @@ def setup_page():
 # app.py အတွင်းရှိ Auto Sync function
 # app.py ၏ auto_sync_on_start function
 # app.py ၏ အစပိုင်းတွင် သို့မဟုတ် Sync လုပ်သည့်နေရာတွင်
+# app.py
 from components.supabase_logic import sync_to_supabase
 
 def auto_sync_on_start():
-    # pending_sales ရှိမှသာ Sync လုပ်ပါ
-    if "pending_sales" in st.session_state and isinstance(st.session_state.pending_sales, list):
-        if len(st.session_state.pending_sales) > 0:
-            try:
-                # ဤနေရာတွင် argument ပို့ပေးလိုက်ပါ
-                sync_to_supabase(st.session_state.pending_sales)
-                st.session_state.pending_sales = []
-                st.success("✅ အားလုံး Sync လုပ်ပြီးပါပြီ။")
-            except Exception as e:
-                st.error(f"Sync Failed: {e}")
-def main():
+    # session_state ထဲက pending_sales ကိုယူပါ
+    pending_data = st.session_state.get("pending_sales", [])
+    
+    if pending_data and isinstance(pending_data, list):
+        try:
+            # ဤနေရာတွင် pending_data ကို argument အဖြစ် ပို့ပေးလိုက်ပါ
+            sync_to_supabase(pending_data)
+            
+            # Sync အောင်မြင်မှသာ ရှင်းပါ
+            st.session_state.pending_sales = []
+            st.success("✅ Cloud နှင့် Sync အောင်မြင်ပါသည်။")
+        except Exception as e:
+            st.error(f"Sync Failed: {e}")def main():
     setup_page()
     init_auth_state()
     init_app_state()
