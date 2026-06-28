@@ -6,55 +6,6 @@ from database import get_sales
 from products import get_products_cached
 from config import APP_SETTINGS
 
-# ==========================================
-# 2. Helper Functions (Advanced Calculation)
-# ==========================================
-def _calculate_profit_by_date(sales, products, start_date, end_date):
-    total_sales = 0
-    total_cost = 0
-    filtered_sales_list = []
-    product_map = {str(p.get('barcode')): p for p in products}
-    
-    for sale in sales:
-        # sales schema: (id, receipt_no, sale_date, items, totals, ...)
-        sale_date_raw = pd.to_datetime(sale[2]).date()
-        
-        # ရက်စွဲ Filter လုပ်ခြင်း
-        if start_date <= sale_date_raw <= end_date:
-            items_json = sale[3]
-            totals_json = sale[4]
-            
-            try:
-                items_data = json.loads(items_json) if isinstance(items_json, str) else items_json
-                totals_data = json.loads(totals_json) if isinstance(totals_json, str) else totals_json
-                if isinstance(totals_data, list): totals_data = totals_data[0]
-                
-                grand_total = float(totals_data.get("grand_total", 0))
-                total_sales += grand_total
-                
-                # Cost တွက်ခြင်း
-                for item in items_data:
-                    barcode = str(item.get('barcode'))
-                    qty = int(item.get('qty', 1))
-                    prod = product_map.get(barcode, {})
-                    buy_price = float(prod.get('buy_price', 0))
-                    total_cost += (buy_price * qty)
-                
-                # Table အတွက် စုဆောင်းခြင်း
-                filtered_sales_list.append({
-                    "ပြေစာအမှတ်": sale[1],
-                    "ရက်စွဲ": sale[2],
-                    "စုစုပေါင်း (MMK)": grand_total,
-                    "ပေးချေမှု": totals_data.get("payment_method", "Cash")
-                })
-            except Exception:
-                continue
-                
-    return total_sales, total_cost, filtered_sales_list
-
-# ==========================================
-# 3. Main Run Module (Profit & Loss UI)
-# ==========================================
 def show_profit_loss():
     st.title("📈 Profit & Loss Report")
 
@@ -71,11 +22,47 @@ def show_profit_loss():
         st.info("လက်ရှိတွင် အရောင်းမှတ်တမ်း မရှိသေးပါ။")
         return
 
-    # 3. Calculations
-    total_sales, total_cost, filtered_sales = _calculate_profit_by_date(sales, products, start_date, end_date)
-    net_profit = total_sales - total_cost
+    # 3. Processing and Filtering (Data များကို သေချာစွာ စစ်ထုတ်ခြင်း)
+    total_sales = 0
+    total_cost = 0
+    filtered_sales = []
+    product_map = {str(p.get('barcode')): p for p in products}
+
+    for sale in sales:
+        # sale[2] သည် ရက်စွဲဖြစ်သည်ဟု ယူဆသည် (ရက်စွဲဖော်မတ်ကို သေချာအောင်လုပ်ပါ)
+        raw_date = pd.to_datetime(sale[2])
+        sale_date = raw_date.date()
+
+        # ရက်စွဲစစ်ခြင်း (Start Date <= Sale Date <= End Date)
+        if start_date <= sale_date <= end_date:
+            try:
+                items_data = json.loads(sale[3]) if isinstance(sale[3], str) else sale[3]
+                totals_data = json.loads(sale[4]) if isinstance(sale[4], str) else sale[4]
+                if isinstance(totals_data, list): totals_data = totals_data[0]
+                
+                grand_total = float(totals_data.get("grand_total", 0))
+                total_sales += grand_total
+                
+                # Cost တွက်ခြင်း
+                for item in items_data:
+                    barcode = str(item.get('barcode'))
+                    qty = int(item.get('qty', 1))
+                    prod = product_map.get(barcode, {})
+                    buy_price = float(prod.get('buy_price', 0))
+                    total_cost += (buy_price * qty)
+                
+                # Table အတွက် စုဆောင်းခြင်း
+                filtered_sales.append({
+                    "ပြေစာအမှတ်": sale[1],
+                    "ရက်စွဲ": raw_date.strftime('%Y-%m-%d %H:%M'), # DateTime ကို String ပြောင်းပြခြင်း
+                    "စုစုပေါင်း (MMK)": grand_total,
+                    "ပေးချေမှု": totals_data.get("payment_method", "Cash")
+                })
+            except Exception:
+                continue
 
     # 4. Display Metrics
+    net_profit = total_sales - total_cost
     col1, col2, col3 = st.columns(3)
     col1.metric("💰 ရောင်းရငွေ (Sales)", f"{total_sales:,.0f} {APP_SETTINGS['currency']}")
     col2.metric("📉 ကုန်ကျစရိတ် (Cost)", f"{total_cost:,.0f} {APP_SETTINGS['currency']}")
@@ -84,14 +71,9 @@ def show_profit_loss():
     st.markdown("---")
     st.write("### 📝 အရောင်းမှတ်တမ်းအသေးစိတ်")
     
+    # 5. Display Table
     if filtered_sales:
         df = pd.DataFrame(filtered_sales)
-        st.dataframe(
-            df, 
-            column_config={
-                "စုစုပေါင်း (MMK)": st.column_config.NumberColumn("စုစုပေါင်း (MMK)", format="%.0f"),
-            },
-            use_container_width=True
-        )
+        st.dataframe(df, use_container_width=True)
     else:
-        st.warning("ရွေးချယ်ထားသော ရက်စွဲများအတွင်း အရောင်းမှတ်တမ်း မတွေ့ရှိပါ။")
+        st.warning(f"ရွေးချယ်ထားသော {start_date} မှ {end_date} အတွင်း အရောင်းမှတ်တမ်း မတွေ့ရှိပါ။")
