@@ -23,13 +23,13 @@ def show_profit_loss():
 
     # 1. Calculation variables
     total_sales = 0
-    total_cogs = 0  # Cost of Goods Sold
+    total_cogs = 0 
     total_tax = 0
     total_discount = 0
     total_expenses = 0
     filtered_sales = []
 
-    # 2. Sales Data Processing
+    # 2. Processing
     for sale in sales_data:
         raw_date = pd.to_datetime(sale.get('created_at'))
         if start_date <= raw_date.date() <= end_date:
@@ -50,33 +50,36 @@ def show_profit_loss():
                 filtered_sales.append({"Receipt": sale.get('receipt_no'), "Total": grand_total})
             except: continue
 
-    # 3. Expenses Processing
     for ex in expenses_data:
         ex_date = pd.to_datetime(ex.get('expense_date')).date()
         if start_date <= ex_date <= end_date:
             total_expenses += float(ex.get('amount', 0))
 
-    # 4. Final Calculation
-    # Net Profit = Sales - COGS - Expenses - Discount - Tax
     net_profit = total_sales - total_cogs - total_expenses - total_discount - total_tax
 
-    # Display Metrics
+    # 3. Formatting Function (ဒဿမနှစ်နေရာအတွက်)
+    def fmt(val):
+        return f"{val:,.2f}"
+
+    # 4. Display Metrics
     st.subheader(f"📊 Summary ({start_date} to {end_date})")
-    
-    # 2 rows of metrics for better clarity
     c1, c2 = st.columns(2)
-    c1.metric("💰 စုစုပေါင်းရောင်းရငွေ", f"{total_sales:,.0f}")
-    c2.metric("🎯 အသားတင်အမြတ်", f"{net_profit:,.0f}")
+    c1.metric("💰 စုစုပေါင်းရောင်းရငွေ", fmt(total_sales))
+    c2.metric("🎯 အသားတင်အမြတ်", fmt(net_profit))
     
     st.write("---")
-    
     sub_c1, sub_c2, sub_c3, sub_c4 = st.columns(4)
-    sub_c1.metric("📉 ကုန်ပစ္စည်းဝယ်ဈေး", f"{total_cogs:,.0f}")
-    sub_c2.metric("🛠️ လည်ပတ်မှုစရိတ်", f"{total_expenses:,.0f}")
-    sub_c3.metric("🏷️ Discount", f"{total_discount:,.0f}")
-    sub_c4.metric("⚖️ Tax", f"{total_tax:,.0f}")
+    sub_c1.metric("📉 ကုန်ပစ္စည်းဝယ်ဈေး", fmt(total_cogs))
+    sub_c2.metric("🛠️ လည်ပတ်မှုစရိတ်", fmt(total_expenses))
+    sub_c3.metric("🏷️ Discount", fmt(total_discount))
+    sub_c4.metric("⚖️ Tax", fmt(total_tax))
 
     st.write("---")
     if filtered_sales:
         st.write("### 📝 အရောင်းမှတ်တမ်းအသေးစိတ်")
-        st.dataframe(pd.DataFrame(filtered_sales), use_container_width=True)
+        df = pd.DataFrame(filtered_sales)
+        # ဇယားကွက်ထဲတွင်လည်း ဒဿမနှစ်နေရာပြစေရန်
+        st.dataframe(
+            df.style.format({"Total": "{:,.2f}"}), 
+            use_container_width=True
+        )
