@@ -21,29 +21,27 @@ def _get_client():
     if not url or not key: return None
     return create_client(url, key)
 
+# Database client ကို Export လုပ်ပေးခြင်း
 supabase = _get_client()
 
 # ==========================================
-# 2. Refund Function (Strict & Clean)
+# 2. Refund Function (Transactional Logic)
 # ==========================================
 def execute_refund(inv, items_to_refund):
     """
-    Refund လုပ်ဆောင်ချက်-
-    1. Status အရင်စစ် (Double-check)
-    2. Stock ပြန်တိုး
-    3. Refund Log သွင်း
-    4. Sale Status ပြောင်း
+    Refund လုပ်ဆောင်ချက်များကို တစ်စုတစ်စည်းတည်း လုပ်ဆောင်ပေးသည်။
     """
     if not supabase: return 0
     
-    # [Step 1] အရေးကြီး: Refund လုပ်ပြီးသားဖြစ်မဖြစ် နောက်ဆုံးတစ်ကြိမ် ပြန်စစ်ပါ
+    # [Step 1] Status အရင်စစ် (Double-check)
+    # Cache မသုံးဘဲ Database မှ အမှန်တကယ် Status ကို စစ်ဆေးပါ
     check = supabase.table("sales").select("status").eq("id", inv['id']).single().execute().data
     if check and check.get("status") == "refunded":
         raise Exception("ဤပြေစာအား Refund လုပ်ပြီးသားဖြစ်၍ ထပ်မံလုပ်ဆောင်၍ မရပါ။")
 
     total_refunded = 0
     
-    # [Step 2] Stock ပြန်တိုးခြင်း
+    # [Step 2] Stock ပြန်တိုးခြင်းနှင့် တန်ဖိုးတွက်ချက်ခြင်း
     for item in items_to_refund:
         barcode = str(item.get('barcode'))
         qty = int(item.get('qty', 0))
@@ -57,7 +55,7 @@ def execute_refund(inv, items_to_refund):
         price = float(item.get('sell_price') or item.get('price') or 0)
         total_refunded += (price * qty)
     
-    # [Step 3] Refund Log သိမ်းခြင်း
+    # [Step 3] Refund table ထဲသို့ သိမ်းဆည်းခြင်း
     refund_data = {
         "receipt_no": inv.get('receipt_no'),
         "items": json.dumps(items_to_refund, ensure_ascii=False),
@@ -71,3 +69,20 @@ def execute_refund(inv, items_to_refund):
     supabase.table("sales").update({"status": "refunded"}).eq("id", inv['id']).execute()
     
     return total_refunded
+
+# ==========================================
+# 3. Sale Functions (အခြားနေရာတွင်သုံးရန်)
+# ==========================================
+def insert_sale(cart, totals, receipt_no, payment_method, customer_name):
+    if not supabase: raise Exception("Database Connection မရှိပါ။")
+    data = {
+        "receipt_no": receipt_no,
+        "customer_name": customer_name,
+        "grand_total": float(totals.get("grand_total", 0)),
+        "payment_type": payment_method,
+        "created_at": get_myanmar_time().isoformat(),
+        "item": json.dumps(cart, ensure_ascii=False),
+        "totals": json.dumps(totals, ensure_ascii=False),
+        "status": "active" 
+    }
+    return supabase.table("sales").insert(data).execute()
