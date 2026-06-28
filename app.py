@@ -21,17 +21,22 @@ def setup_page():
     st.set_page_config(page_title="Barcode POS System", layout="wide")
 
 # app.py အတွင်းရှိ Auto Sync function
+# app.py ၏ auto_sync_on_start function
 def auto_sync_on_start():
-    # Session ထဲတွင် pending_sales ရှိမရှိနှင့် list ဟုတ်မဟုတ် စစ်ဆေးပါ
-    if "pending_sales" in st.session_state and isinstance(st.session_state.pending_sales, list):
-        if len(st.session_state.pending_sales) > 0:
+    # Session state ကို စစ်ဆေးပါ
+    pending_data = st.session_state.get("pending_sales", [])
+    
+    if pending_data and isinstance(pending_data, list):
+        with st.spinner("🌐 Cloud နှင့် ချိတ်ဆက်နေသည်..."):
             try:
-                # Import လုပ်ထားသော function ကို တိုက်ရိုက်သုံးပါ
-                sync_to_supabase(st.session_state.pending_sales)
+                # နာမည်အသစ်ဖြင့် ခေါ်ပြီး pending_data ကို argument အနေဖြင့် ပို့ပေးပါ
+                from components.supabase_logic import perform_full_sync
+                perform_full_sync(pending_data)
+                
                 st.session_state.pending_sales = []
-                st.success("✅ Sync လုပ်ပြီးပါပြီ။")
+                st.success("✅ အားလုံး Sync လုပ်ပြီးပါပြီ။")
             except Exception as e:
-                st.error(f"Sync အဆင်မပြေပါ: {e}")
+                st.warning(f"Sync အဆင်မပြေပါ: {e}")
 
 def main():
     setup_page()
