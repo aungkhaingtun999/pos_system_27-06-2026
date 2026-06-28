@@ -14,6 +14,7 @@ def show_refund():
         st.success(st.session_state.msg)
         st.session_state.msg = None
 
+    # Fetch Sales Data
     sales_data = supabase.table("sales").select("*").order("id", desc=True).execute().data or []
     
     options = {f"📄 {r.get('receipt_no')}": r for r in sales_data}
@@ -34,7 +35,8 @@ def show_refund():
             total_refund_value = 0
             
             for i, item in enumerate(items):
-                price = float(item.get('price', 0))
+                # [ပြင်ဆင်ချက်] sell_price ကို ဦးစားပေးခေါ်ယူခြင်း
+                price = float(item.get('sell_price') or item.get('price') or 0)
                 qty = int(item.get('qty', 1))
                 item_total = price * qty
                 
@@ -54,6 +56,7 @@ def show_refund():
             if submitted:
                 if selected_refund_items:
                     # [ဒီနေရာတွင် သင်၏ refund လုပ်ဆောင်ချက်များကို ထည့်သွင်းပါ]
+                    # ဥပမာ: log_refund(inv['id'], selected_refund_items, total_refund_value)
                     st.session_state.msg = f"✅ Refund of {total_refund_value:,.2f} MMK processed successfully!"
                     st.rerun()
                 else:
