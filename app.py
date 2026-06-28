@@ -1,10 +1,11 @@
 import sys
 import os
+import streamlit as st
 
-# Root directory ကို Path ထဲသို့ သေချာထည့်ခြင်း (Import Error မတက်စေရန်)
+# Root directory ကို Path ထဲသို့ သေချာထည့်ခြင်း
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-import streamlit as st
+# Auth & Config
 from auth import check_password, init_auth_state
 from utils import init_app_state
 from config import init_session
@@ -16,8 +17,10 @@ from components.reports import show_reports
 from components.inventory import show_inventory
 from components.profit_loss import show_profit_loss
 from components.refund import show_refund
-# အသစ် (ဤသို့ ပြင်ရေးပါ)
-from components.supabase_logic import insert_sale
+from components.receipt import show_receipt # show_receipt အတွက် import ထည့်ပေးရန် လိုအပ်သည်
+
+# Supabase Logic Import
+from components.supabase_logic import insert_sale, sync_to_supabase
 
 def setup_page():
     st.set_page_config(
@@ -31,15 +34,18 @@ def auto_sync_on_start():
     if "pending_sales" in st.session_state and st.session_state.pending_sales:
         with st.spinner("🌐 Cloud နှင့် ချိတ်ဆက်နေသည်..."):
             try:
-                from components.supabase_logic import sync_to_supabase
                 for sale in list(st.session_state.pending_sales):
-                    insert_sale_to_supabase(
-                        sale['cart'], sale['totals'], sale['rec_no'], 
-                        sale['payment_method'], sale['customer']
+                    # import လုပ်ထားသော insert_sale ကို သုံးပါ
+                    insert_sale(
+                        sale['cart'], 
+                        sale['totals'], 
+                        sale['rec_no'], 
+                        sale['payment_method'], 
+                        sale['customer']
                     )
                     st.session_state.pending_sales.remove(sale)
-            except Exception:
-                st.warning("အင်တာနက် အားနည်းနေ၍ Sync မအောင်မြင်ပါ။ နောက်မှ ထပ်ကြိုးစားပါမည်။")
+            except Exception as e:
+                st.warning(f"အင်တာနက် အားနည်းနေ၍ Sync မအောင်မြင်ပါ။ ({e})")
 
 def run_router():
     """Menu ရွေးချယ်မှုအလိုက် Page ပြောင်းလဲခြင်း"""
@@ -51,7 +57,6 @@ def run_router():
         "Refund": show_refund,
     }
     current_menu = st.session_state.get("menu", "POS System")
-    # ရွေးချယ်ထားသော menu ကို execute လုပ်ပါ
     menu_map.get(current_menu, show_pos_system)()
 
 def main():
