@@ -497,9 +497,4 @@ return refund_amount
 
 
 
-    except Exception as e:
-
-
-        raise Exception(
-            f"Refund Failed : {e}"
-        )
+    
