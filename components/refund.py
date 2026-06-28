@@ -1,49 +1,74 @@
-﻿import streamlit as st
+import streamlit as st
 import json
-from components.supabase_logic import supabase, execute_refund, log_refund
+from components.supabase_logic import supabase
 
 def show_refund():
     st.title("🔄 Refund Manager")
 
-    # [အချက် ၁] Session တွေကို ကြိုတင်သတ်မှတ်ထားမှ Error မတက်မှာပါ
+    # Session States
     if "current_refund_inv" not in st.session_state: st.session_state.current_refund_inv = None
     if "msg" not in st.session_state: st.session_state.msg = None
 
-    # [အချက် ၂] Message ပြသခြင်း (အရေးကြီးပါတယ်)
+    # Message Display
     if st.session_state.msg:
         st.success(st.session_state.msg)
-        st.session_state.msg = None # ပြပြီးရင် ပြန်ရှင်းပေးပါ
+        st.session_state.msg = None
 
-    sales_data = supabase.table("sales").select("*").order("id", desc=True).execute().data
+    sales_data = supabase.table("sales").select("*").order("id", desc=True).execute().data or []
     
     options = {f"📄 {r.get('receipt_no')}": r for r in sales_data}
     selected = st.selectbox("🔍 Select Receipt:", [""] + list(options.keys()))
+    
     if selected:
         st.session_state.current_refund_inv = options[selected]
     
     inv = st.session_state.current_refund_inv
     
     if inv:
+        st.subheader(f"📋 Items in {inv.get('receipt_no')}")
         items = json.loads(inv.get('item', '[]')) if isinstance(inv.get('item'), str) else inv.get('item', [])
 
-        # [အချက် ၃] Form အလုပ်လုပ်အောင် သေချာပြင်ထားပါတယ်
+        # Refund Form
         with st.form("refund_form"):
-            check_states = {i: st.checkbox(f"{item.get('product_name', 'Item')}") for i, item in enumerate(items)}
+            selected_refund_items = []
+            total_refund_value = 0
+            
+            for i, item in enumerate(items):
+                price = float(item.get('price', 0))
+                qty = int(item.get('qty', 1))
+                item_total = price * qty
+                
+                # Layout for Item Display
+                col1, col2, col3 = st.columns([3, 1, 1])
+                is_checked = col1.checkbox(f"{item.get('product_name', 'Item')} (x{qty})", key=f"chk_{i}")
+                col2.write(f"@{price:,.2f}")
+                col3.write(f"**{item_total:,.2f}**")
+                
+                if is_checked:
+                    selected_refund_items.append(item)
+                    total_refund_value += item_total
+
+            st.write(f"### 💰 Refund Total: {total_refund_value:,.2f} MMK")
             submitted = st.form_submit_button("⚠️ Process Refund")
             
             if submitted:
-                # Logic တစ်ခုခုလုပ်ပြီးရင် msg ထဲကို ထည့်လိုက်ပါ
-                st.session_state.msg = "✅ Refund processed successfully!"
-                st.rerun() # ဒါမှ message ကို အပေါ်မှာ ပြနိုင်မှာပါ
+                if selected_refund_items:
+                    # [ဒီနေရာတွင် သင်၏ refund လုပ်ဆောင်ချက်များကို ထည့်သွင်းပါ]
+                    st.session_state.msg = f"✅ Refund of {total_refund_value:,.2f} MMK processed successfully!"
+                    st.rerun()
+                else:
+                    st.warning("Please select at least one item to refund.")
 
         st.divider()
-        # [အချက် ၄] Button တွေ အလုပ်လုပ်အောင် လုပ်ဆောင်ချက်တွေကို ခွဲထားပါတယ်
-        if st.button("🚫 Void Entire Receipt"):
+        
+        # Actions
+        col1, col2 = st.columns(2)
+        if col1.button("🚫 Void Entire Receipt"):
             supabase.table("sales").delete().eq("id", inv['id']).execute()
             st.session_state.msg = "⚠️ Receipt voided!"
             st.session_state.current_refund_inv = None
             st.rerun()
             
-        if st.button("❌ Exit"):
+        if col2.button("❌ Exit"):
             st.session_state.current_refund_inv = None
             st.rerun()
