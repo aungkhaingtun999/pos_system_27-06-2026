@@ -69,15 +69,20 @@ def sync_to_supabase(pending_sales):
 # ==========================================
 # 3. Optimized Refund Function
 # ==========================================
+# components/supabase_logic.py
 def execute_refund(inv, items_to_refund):
-    """Refund လုပ်ဆောင်ချက် - Atomic Locking ဖြင့် တည်ဆောက်ထားသည်"""
     if not supabase: return 0
     
+    # ၁။ လက်ရှိ status ကို အရင်စစ် (Refunded ဖြစ်မဖြစ်)
     latest_check = supabase.table("sales").select("status").eq("id", inv['id']).single().execute().data
+    
     if latest_check and latest_check.get("status") == "refunded":
         raise Exception("⚠️ ဤပြေစာအား Refund လုပ်ပြီးသားဖြစ်၍ ထပ်မံလုပ်ဆောင်၍ မရပါ။")
 
+    # ၂။ အားလုံးသေချာမှ update လုပ်ပါ
     supabase.table("sales").update({"status": "refunded"}).eq("id", inv['id']).execute()
+    
+    # ... (ကျန်တဲ့ stock update နဲ့ insert refund logic) ...
 
     try:
         total_refunded = 0
