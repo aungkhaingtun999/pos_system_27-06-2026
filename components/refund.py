@@ -1,7 +1,5 @@
 import streamlit as st
 import json
-from datetime import datetime
-import pytz
 import sys
 import os
 
@@ -12,7 +10,6 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 try:
     from components.supabase_logic import supabase, execute_refund
 except ImportError:
-    # အကယ်၍ အထက်ပါ path မရလျှင် root ကို ပြန်ရှာခြင်း
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
     from components.supabase_logic import supabase, execute_refund
 
@@ -39,8 +36,9 @@ def show_refund():
     inv = options.get(selected) if selected else None
 
     if inv:
+        # ၁။ Refund လုပ်ပြီးသားလား အရင်စစ်ပါ
         if inv.get('status') == 'refunded':
-            st.error("⚠️ ဤပြေစာသည် ယခင်ကပင် Refund လုပ်ပြီးသားဖြစ်ပါသည်။")
+            st.error("⚠️ ဤပြေစာအား Refund လုပ်ပြီးသားဖြစ်၍ ထပ်မံလုပ်ဆောင်၍ မရပါ။")
         else:
             st.subheader(f"📋 Items in {inv.get('receipt_no')}")
             items = json.loads(inv.get('item', '[]')) if isinstance(inv.get('item'), str) else inv.get('item', [])
@@ -66,30 +64,21 @@ def show_refund():
                 st.write("---")
                 st.write(f"### 💰 Total Refund Amount: {total_refund_value:,.2f} MMK")
                 
+                # Form အတွင်းမှာ submit button သုံးရပါမယ်
                 if st.form_submit_button("⚠️ Confirm Process Refund"):
                     if not selected_refund_items:
                         st.warning("Please select at least one item.")
                     else:
                         try:
-                            # ဤနေရာတွင် logic က status ကို အရင် lock လုပ်ပါမည်
-                            processed_amount = execute_refund(inv, selected_refund_items)
-                            st.session_state.msg = f"✅ Refund {processed_amount:,.2f} MMK processed!"
-                            st.rerun() 
+                            # 2. နောက်ဆုံးအကြိမ် Status ကို DB မှာ ထပ်စစ် (Double Verification)
+                            current_sale = supabase.table("sales").select("status").eq("id", inv['id']).single().execute().data
+                            
+                            if current_sale and current_sale.get("status") == "refunded":
+                                st.error("❌ ဤပြေစာကို Refund လုပ်ပြီးသွားပါပြီ။ Refresh လုပ်လိုက်ပါ။")
+                            else:
+                                # Refund လုပ်ဆောင်ခြင်း
+                                processed_amount = execute_refund(inv, selected_refund_items)
+                                st.session_state.msg = f"✅ Refund {processed_amount:,.2f} MMK processed!"
+                                st.rerun() 
                         except Exception as e:
                             st.error(f"Refund Error: {e}")
-                            # components/refund.py တွင် Refund ခလုတ်ကို နှိပ်သည့်အခါ
-if st.button("Confirm Refund"):
-    # ၁။ Database မှ နောက်ဆုံး status ကို ပြန်စစ်ပါ
-    latest_status = supabase.table("sales").select("status").eq("id", inv['id']).single().execute().data
-    
-    if latest_status and latest_status.get("status") == "refunded":
-        st.error("⚠️ ဤပြေစာအား Refund လုပ်ပြီးသားဖြစ်၍ ထပ်မံလုပ်ဆောင်၍ မရပါ။")
-        st.stop() # Logic ကို ဒီနေရာမှာပဲ ရပ်လိုက်ပါ
-    
-    # ၂။ Refund မလုပ်ရသေးလျှင်သာ ဆက်လုပ်ပါ
-    try:
-        execute_refund(inv, items_to_refund)
-        st.success("✅ Refund အောင်မြင်ပါသည်။")
-        st.rerun()
-    except Exception as e:
-        st.error(f"Error: {e}")
