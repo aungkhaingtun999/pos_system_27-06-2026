@@ -5,7 +5,7 @@ from components.supabase_logic import supabase, execute_refund
 def show_refund():
     st.title("🔄 Refund Manager")
 
-    # Session States initialization
+    # Session State စစ်ဆေးခြင်း
     if "current_refund_inv" not in st.session_state: st.session_state.current_refund_inv = None
     if "msg" not in st.session_state: st.session_state.msg = None
 
@@ -13,12 +13,16 @@ def show_refund():
         st.success(st.session_state.msg)
         st.session_state.msg = None
 
-    # Fetching sales data
-    sales_data = supabase.table("sales").select("*").order("id", desc=True).execute().data or []
+    # Fetching latest sales data
+    try:
+        sales_data = supabase.table("sales").select("*").order("id", desc=True).execute().data or []
+    except Exception as e:
+        st.error(f"Database Error: {e}")
+        return
     
-    # Selection Menu
-    options = {f"📄 {r.get('receipt_no')} {'(Refunded)' if r.get('status') == 'refunded' else ''}": r for r in sales_data}
-    selected = st.selectbox("🔍 Select Receipt:", [""] + list(options.keys()))
+    # Selection Menu (Refunded ဖြစ်ပြီးသားကို အချက်အလက်နှင့်အတူပြသ)
+    options = {f"📄 {r.get('receipt_no')} {'[REFUNDED]' if r.get('status') == 'refunded' else ''}": r for r in sales_data}
+    selected = st.selectbox("🔍 Select Receipt to Refund:", [""] + list(options.keys()))
     
     if selected:
         st.session_state.current_refund_inv = options[selected]
@@ -26,9 +30,12 @@ def show_refund():
     inv = st.session_state.current_refund_inv
     
     if inv:
-        # Check Status
+        # [ பாதுகாப்பு ] Refunded ဖြစ်ပြီးသားကို ထပ်မလုပ်ရအောင် ပိတ်ပင်ခြင်း
         if inv.get('status') == 'refunded':
-            st.error("⚠️ ဤပြေစာသည် ယခင်ကပင် Refund လုပ်ပြီးသားဖြစ်ပါသည်။")
+            st.error("⚠️ ဤပြေစာသည် ယခင်ကပင် Refund လုပ်ပြီးသားဖြစ်ပါသည်။ ထပ်မံလုပ်ဆောင်၍ မရပါ။")
+            if st.button("ပြန်လည်ရွေးချယ်မည်"):
+                st.session_state.current_refund_inv = None
+                st.rerun()
         else:
             st.subheader(f"📋 Items in {inv.get('receipt_no')}")
             items = json.loads(inv.get('item', '[]')) if isinstance(inv.get('item'), str) else inv.get('item', [])
@@ -38,7 +45,6 @@ def show_refund():
                 total_refund_value = 0
                 
                 for i, item in enumerate(items):
-                    # Price calculation (sell_price ကို ဦးစားပေး)
                     price = float(item.get('sell_price') or item.get('price') or 0)
                     qty = int(item.get('qty', 1))
                     item_total = price * qty
@@ -53,23 +59,23 @@ def show_refund():
                         total_refund_value += item_total
 
                 st.write(f"### 💰 Refund Total: {total_refund_value:,.2f} MMK")
-                submitted = st.form_submit_button("⚠️ Process Refund")
+                submitted = st.form_submit_button("⚠️ Confirm Process Refund")
                 
                 if submitted:
-                    if selected_refund_items:
+                    if not selected_refund_items:
+                        st.warning("Please select at least one item.")
+                    else:
                         try:
-                            # execute_refund ထဲမှာတင် status update နဲ့ refund log အားလုံးပါပြီးသားဖြစ်ပါတယ်
+                            # [Logic] execute_refund ထဲတွင် Stock ပြန်ထည့်ခြင်း၊ Refund မှတ်တမ်းတင်ခြင်း
+                            # နှင့် status ကို 'refunded' ပြောင်းခြင်းတို့ကို တစ်ပါတည်း လုပ်ဆောင်ပါမည်
                             processed_amount = execute_refund(inv, selected_refund_items)
                             
                             st.session_state.msg = f"✅ Refund of {processed_amount:,.2f} MMK processed successfully!"
                             st.session_state.current_refund_inv = None
                             st.rerun()
                         except Exception as e:
-                            st.error(f"Database Error: {e}")
-                    else:
-                        st.warning("Please select at least one item to refund.")
+                            st.error(f"Refund Error: {e}")
 
-        st.divider()
-        if st.button("❌ Exit"):
+        if st.button("❌ Close"):
             st.session_state.current_refund_inv = None
             st.rerun()
