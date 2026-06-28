@@ -1,59 +1,35 @@
 import sys
 import os
 import streamlit as st
+from components import supabase_logic 
 
-# Root directory ကို Path ထဲသို့ သေချာထည့်ခြင်း
+# Root directory 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-# Auth & Config
 from auth import check_password, init_auth_state
 from utils import init_app_state
 from config import init_session
-
-# Component များ import လုပ်ခြင်း
-try:
-    from components.sidebar import show_sidebar
-    from components.pos_system import show_pos_system
-    from components.reports import show_reports
-    from components.inventory import show_inventory
-    from components.profit_loss import show_profit_loss
-    from components.refund import show_refund
-    from components.receipt import show_receipt
-    from components.supabase_logic import insert_sale, sync_to_supabase
-except Exception as e:
-    st.error(f"Module Import Error: {e}")
-    st.stop()
+from components.sidebar import show_sidebar
+from components.pos_system import show_pos_system
+from components.reports import show_reports
+from components.inventory import show_inventory
+from components.profit_loss import show_profit_loss
+from components.refund import show_refund
+from components.receipt import show_receipt
 
 def setup_page():
-    st.set_page_config(
-        page_title="Barcode POS System", 
-        layout="wide", 
-        initial_sidebar_state="expanded"
-    )
-from components import supabase_logic 
+    st.set_page_config(page_title="Barcode POS System", layout="wide")
 
-# auto_sync_on_start function တွင် ဤသို့ ပြန်ခေါ်ပါ
 def auto_sync_on_start():
     pending_data = st.session_state.get("pending_sales", [])
     if pending_data:
         try:
-            # တိုက်ရိုက်မခေါ်ဘဲ module နာမည်ဖြင့် ခေါ်ပါ
-            supabase_logic.sync_to_supabase(pending_data) 
+            # နာမည်အသစ်ဖြင့် ခေါ်ခြင်း
+            supabase_logic.perform_full_sync(pending_data) 
             st.session_state.pending_sales = []
-            st.success("✅ Sync အောင်မြင်ပါသည်။")
+            st.success("✅ Cloud သို့ အားလုံး Sync လုပ်ပြီးပါပြီ။")
         except Exception as e:
             st.error(f"Sync Failed: {e}")
-def run_router():
-    """Menu ရွေးချယ်မှုအလိုက် Page ပြောင်းလဲခြင်း"""
-    menu_map = {
-        "POS System": show_pos_system,
-        "Inventory": show_inventory,
-        "Reports": show_reports,
-        "Profit & Loss": show_profit_loss, 
-        "Refund": show_refund,
-    }
-    current_menu = st.session_state.get("menu", "POS System")
-    menu_map.get(current_menu, show_pos_system)()
 
 def main():
     setup_page()
@@ -61,20 +37,22 @@ def main():
     init_app_state()
     init_session()
 
-    # Login စစ်ဆေးခြင်း
-    if not check_password(): 
-        st.stop()
-        
-    # App စဖွင့်ချိန် Auto Sync လုပ်ခြင်း
-    auto_sync_on_start()
+    if not check_password(): st.stop()
     
-    # Sidebar ပြသခြင်း
+    auto_sync_on_start()
     show_sidebar()
     
-    # ရွေးချယ်ထားသော စာမျက်နှာကို ပြသခြင်း
-    run_router()
+    # Page Router
+    menu_map = {
+        "POS System": show_pos_system,
+        "Inventory": show_inventory,
+        "Reports": show_reports,
+        "Profit & Loss": show_profit_loss, 
+        "Refund": show_refund,
+    }
+    menu_map.get(st.session_state.get("menu", "POS System"), show_pos_system)()
 
-    # --- Receipt Logic ---
+    # Receipt Logic
     if st.session_state.get("receipt") is not None:
         show_receipt(
             data=st.session_state.receipt,
@@ -83,8 +61,6 @@ def main():
             payment_method=st.session_state.get("current_payment_method", "Cash"),
             customer=st.session_state.get("current_customer", "Walk-in")
         )
-        
-        # Receipt ပြပြီးလျှင် Session ကို ပြန်လည်ရှင်းလင်းခြင်း
         if st.button("Close Receipt"):
             st.session_state.receipt = None
             st.session_state.receipt_totals = None
