@@ -158,12 +158,14 @@ def show_refund():
         )
 
 
-        price=safe_float(
-            item.get(
-                "sell_price",
-                0
-            )
-        )
+        price = safe_float(
+    item.get("sell_price")
+    or item.get("selling_price")
+    or item.get("unit_price")
+    or item.get("price")
+    or item.get("amount")
+    or 0
+)
 
 
         col1,col2,col3 = st.columns(
