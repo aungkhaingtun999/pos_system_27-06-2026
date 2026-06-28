@@ -1,11 +1,11 @@
 import streamlit as st
 import json
-from components.supabase_logic import supabase
+from components.supabase_logic import supabase, execute_refund
 
 def show_refund():
     st.title("🔄 Refund Manager")
 
-    # Session States
+    # Session States initialization
     if "current_refund_inv" not in st.session_state: st.session_state.current_refund_inv = None
     if "msg" not in st.session_state: st.session_state.msg = None
 
@@ -13,9 +13,10 @@ def show_refund():
         st.success(st.session_state.msg)
         st.session_state.msg = None
 
+    # Fetching sales data
     sales_data = supabase.table("sales").select("*").order("id", desc=True).execute().data or []
     
-    # [ထိန်းချုပ်မှု] Refunded ဖြစ်နေသော Receipt များကို ရွေးချယ်နိုင်သော်လည်း Warning ပြမည်
+    # Selection Menu
     options = {f"📄 {r.get('receipt_no')} {'(Refunded)' if r.get('status') == 'refunded' else ''}": r for r in sales_data}
     selected = st.selectbox("🔍 Select Receipt:", [""] + list(options.keys()))
     
@@ -25,9 +26,9 @@ def show_refund():
     inv = st.session_state.current_refund_inv
     
     if inv:
-        # [ထိန်းချုပ်မှု] အရေးအကြီးဆုံးအပိုင်း: Status ကို စစ်ဆေးပါ
+        # Check Status
         if inv.get('status') == 'refunded':
-            st.error("⚠️ ဤပြေစာသည် ယခင်ကပင် Refund လုပ်ပြီးသားဖြစ်ပါသည်။ ထပ်မံလုပ်ဆောင်၍ မရပါ။")
+            st.error("⚠️ ဤပြေစာသည် ယခင်ကပင် Refund လုပ်ပြီးသားဖြစ်ပါသည်။")
         else:
             st.subheader(f"📋 Items in {inv.get('receipt_no')}")
             items = json.loads(inv.get('item', '[]')) if isinstance(inv.get('item'), str) else inv.get('item', [])
@@ -37,6 +38,7 @@ def show_refund():
                 total_refund_value = 0
                 
                 for i, item in enumerate(items):
+                    # Price calculation (sell_price ကို ဦးစားပေး)
                     price = float(item.get('sell_price') or item.get('price') or 0)
                     qty = int(item.get('qty', 1))
                     item_total = price * qty
@@ -47,7 +49,7 @@ def show_refund():
                     col3.write(f"**{item_total:,.2f}**")
                     
                     if is_checked:
-                        selected_refund_items.append(item)
+                        selected_refund_items.append({**item, 'qty': qty, 'price': price})
                         total_refund_value += item_total
 
                 st.write(f"### 💰 Refund Total: {total_refund_value:,.2f} MMK")
@@ -55,11 +57,22 @@ def show_refund():
                 
                 if submitted:
                     if selected_refund_items:
-                        # [အရေးကြီး] Refund လုပ်ပြီးပါက Status ကို 'refunded' သို့ ပြောင်းပါ
-                        supabase.table("sales").update({"status": "refunded"}).eq("id", inv['id']).execute()
-                        
-                        st.session_state.msg = f"✅ Refund processed and Receipt marked as Refunded!"
-                        st.session_state.current_refund_inv = None
-                        st.rerun()
+                        try:
+                            # 1. Update status to 'refunded'
+                            supabase.table("sales").update({"status": "refunded"}).eq("id", inv['id']).execute()
+                            
+                            # 2. Execute stock increment and refund logging
+                            execute_refund(inv, selected_refund_items)
+                            
+                            st.session_state.msg = f"✅ Refund of {total_refund_value:,.2f} MMK processed successfully!"
+                            st.session_state.current_refund_inv = None
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Database Error: {e}")
                     else:
-                        st.warning("Please select at least one item.")
+                        st.warning("Please select at least one item to refund.")
+
+        st.divider()
+        if st.button("❌ Exit"):
+            st.session_state.current_refund_inv = None
+            st.rerun()
