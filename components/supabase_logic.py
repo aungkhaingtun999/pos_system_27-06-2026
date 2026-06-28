@@ -2,7 +2,12 @@ import streamlit as st
 import json
 from supabase import create_client
 from datetime import datetime
+import pytz  # လိုအပ်သော library
 
+# မြန်မာစံတော်ချိန် သတ်မှတ်ခြင်း
+def get_myanmar_time():
+    myanmar_tz = pytz.timezone('Asia/Yangon')
+    return datetime.now(myanmar_tz)
 # ==========================================
 # 1. Connection Initialization
 # ==========================================
