@@ -24,22 +24,23 @@ def setup_page():
         st.set_page_config(page_title="Barcode POS System", layout="wide")
         st.session_state.page_config_set = True
 
+# app.py တွင် သေချာပြင်ပါ
+from components.supabase_logic import sync_to_supabase
+
 def auto_sync_on_start():
-    # session_state ထဲက pending_sales ကိုယူပါ
+    # session_state မှ data ကိုယူပြီးမှ Argument ပို့ပါ
     pending_data = st.session_state.get("pending_sales", [])
     
-    # Data ရှိမှသာ Sync လုပ်ပါ
-    if pending_data and isinstance(pending_data, list) and len(pending_data) > 0:
+    if isinstance(pending_data, list) and len(pending_data) > 0:
         try:
-            # Argument အနေနဲ့ pending_data ကို ပို့ပေးလိုက်ပါ
+            # Argument ကို သေချာပို့ပေးပါ
             sync_to_supabase(pending_data)
-            
-            # Sync အောင်မြင်မှသာ ရှင်းပါ
             st.session_state.pending_sales = []
-            st.success("✅ Cloud နှင့် Sync အောင်မြင်ပါသည်။")
+            st.success("✅ Sync အောင်မြင်ပါသည်။")
         except Exception as e:
             st.error(f"Sync Failed: {e}")
 
+# (ကျန်သည့် app.py logic များသည် အရင်အတိုင်းထားပါ)
 def main():
     setup_page()
     init_auth_state()
