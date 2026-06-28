@@ -13,7 +13,20 @@ def get_supabase_client():
 
 supabase = get_supabase_client()
 
+# components/supabase_logic.py
 def sync_to_supabase(pending_sales):
+    """Offline မှ data များကို Cloud သို့ Sync လုပ်ခြင်း"""
+    if not pending_sales or not isinstance(pending_sales, list):
+        return
+
+    for sale in pending_sales:
+        # သင်၏ DB Insert Logic ဤနေရာတွင်
+        supabase.table("sales").insert({
+            "receipt_no": sale.get('rec_no'),
+            "item": json.dumps(sale.get('cart')),
+            "grand_total": sale.get('totals', {}).get('grand_total'),
+            "status": "active"
+        }).execute()
     """Sync logic: pending_sales (list) ကို အတိအကျ လက်ခံသည်"""
     if not supabase: raise Exception("Database Connection မရှိပါ။")
     for sale in pending_sales:
