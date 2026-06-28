@@ -77,3 +77,19 @@ def show_refund():
                             st.rerun() 
                         except Exception as e:
                             st.error(f"Refund Error: {e}")
+                            # components/refund.py တွင် Refund ခလုတ်ကို နှိပ်သည့်အခါ
+if st.button("Confirm Refund"):
+    # ၁။ Database မှ နောက်ဆုံး status ကို ပြန်စစ်ပါ
+    latest_status = supabase.table("sales").select("status").eq("id", inv['id']).single().execute().data
+    
+    if latest_status and latest_status.get("status") == "refunded":
+        st.error("⚠️ ဤပြေစာအား Refund လုပ်ပြီးသားဖြစ်၍ ထပ်မံလုပ်ဆောင်၍ မရပါ။")
+        st.stop() # Logic ကို ဒီနေရာမှာပဲ ရပ်လိုက်ပါ
+    
+    # ၂။ Refund မလုပ်ရသေးလျှင်သာ ဆက်လုပ်ပါ
+    try:
+        execute_refund(inv, items_to_refund)
+        st.success("✅ Refund အောင်မြင်ပါသည်။")
+        st.rerun()
+    except Exception as e:
+        st.error(f"Error: {e}")
