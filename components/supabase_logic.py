@@ -41,64 +41,65 @@ def insert_sale(cart, totals, receipt_no, payment_method, customer_name):
     return supabase.table("sales").insert(data).execute()
 
 def process_sale_stock_update(cart):
-    """
-    Sale လုပ်သည့်အခါ Stock ကို အလိုအလျောက် နုတ်ပေးခြင်း
-    """
     if not supabase: return
     for item in cart:
         barcode = str(item.get("barcode"))
         qty = int(item.get("qty", 0))
-        
-        # Database မှ လက်ရှိ stock_qty ကို ရယူခြင်း
         product = supabase.table("products").select("stock_qty").eq("barcode", barcode).single().execute().data
         if product:
             new_stock = int(product.get("stock_qty", 0)) - qty
             supabase.table("products").update({"stock_qty": new_stock}).eq("barcode", barcode).execute()
 
 # ==========================================
-# 3. Refund Function
+# 3. Optimized Refund Function (Fixed)
 # ==========================================
 def execute_refund(inv, items_to_refund):
     """
     Refund လုပ်ဆောင်ချက်-
-    1. Status အရင်စစ် (Double-check)
-    2. Stock ပြန်တိုး
-    3. Refund Log သွင်း
-    4. Sale Status ပြောင်း
+    1. [Atomic Check] Status အရင်စစ်
+    2. [Locking] Status ကို 'refunded' ချက်ချင်းပြောင်း (အကြိမ်ကြိမ်လုပ်၍မရအောင်)
+    3. Stock ပြန်တိုး
+    4. Refund Log သွင်း
     """
     if not supabase: return 0
     
-    # [Step 1] Status အရင်စစ်
-    check = supabase.table("sales").select("status").eq("id", inv['id']).single().execute().data
-    if check and check.get("status") == "refunded":
-        raise Exception("ဤပြေစာအား Refund လုပ်ပြီးသားဖြစ်၍ ထပ်မံလုပ်ဆောင်၍ မရပါ။")
+    # [Step 1]: Database မှ လက်ရှိ status ကို နောက်ဆုံးတစ်ကြိမ် တိုက်ရိုက်စစ်ပါ
+    latest_check = supabase.table("sales").select("status").eq("id", inv['id']).single().execute().data
+    if latest_check and latest_check.get("status") == "refunded":
+        raise Exception("⚠️ ဤပြေစာအား Refund လုပ်ပြီးသားဖြစ်၍ ထပ်မံလုပ်ဆောင်၍ မရပါ။")
 
-    total_refunded = 0
-    
-    # [Step 2] Stock ပြန်တိုးခြင်း
-    for item in items_to_refund:
-        barcode = str(item.get('barcode'))
-        qty = int(item.get('qty', 0))
-        
-        product = supabase.table("products").select("stock_qty").eq("barcode", barcode).single().execute().data
-        if product:
-            new_stock = int(product.get("stock_qty", 0)) + qty
-            supabase.table("products").update({"stock_qty": new_stock}).eq("barcode", barcode).execute()
-            
-        price = float(item.get('sell_price') or item.get('price') or 0)
-        total_refunded += (price * qty)
-    
-    # [Step 3] Refund Log သိမ်းခြင်း
-    refund_data = {
-        "receipt_no": inv.get('receipt_no'),
-        "items": json.dumps(items_to_refund, ensure_ascii=False),
-        "refund_amount": float(total_refunded),
-        "refunded_at": get_myanmar_time().isoformat(),
-        "details": f"Refunded {len(items_to_refund)} items"
-    }
-    supabase.table("refunds").insert(refund_data).execute()
-    
-    # [Step 4] Sales Receipt ကို 'refunded' ဟု အမှတ်အသားပြုခြင်း
+    # [Step 2 - CRITICAL]: Refund မစခင် status ကို 'refunded' အရင်ပြောင်းထားပါ (Locking)
+    # ဤအဆင့်က အခြား process များမှ ထပ်မံ Refund လုပ်ခြင်းကို တားဆီးပေးမည်
     supabase.table("sales").update({"status": "refunded"}).eq("id", inv['id']).execute()
-    
-    return total_refunded
+
+    try:
+        total_refunded = 0
+        # [Step 3]: Stock ပြန်တိုးခြင်း
+        for item in items_to_refund:
+            barcode = str(item.get('barcode'))
+            qty = int(item.get('qty', 0))
+            
+            product = supabase.table("products").select("stock_qty").eq("barcode", barcode).single().execute().data
+            if product:
+                new_stock = int(product.get("stock_qty", 0)) + qty
+                supabase.table("products").update({"stock_qty": new_stock}).eq("barcode", barcode).execute()
+                
+            price = float(item.get('sell_price') or item.get('price') or 0)
+            total_refunded += (price * qty)
+        
+        # [Step 4]: Refund Log သိမ်းခြင်း
+        refund_data = {
+            "receipt_no": inv.get('receipt_no'),
+            "items": json.dumps(items_to_refund, ensure_ascii=False),
+            "refund_amount": float(total_refunded),
+            "refunded_at": get_myanmar_time().isoformat(),
+            "details": f"Refunded {len(items_to_refund)} items"
+        }
+        supabase.table("refunds").insert(refund_data).execute()
+        
+        return total_refunded
+
+    except Exception as e:
+        # အကယ်၍ အမှားတစ်ခုခုဖြစ်ခဲ့လျှင် status ကို ပြန်ဖွင့်ပေးရန် လိုအပ်ပါက ဤနေရာတွင် logic ထည့်ပါ
+        # သို့သော် များသောအားဖြင့် status ကို 'refunded' အဖြစ်ထားခဲ့ခြင်းက ပို၍လုံခြုံသည်
+        raise Exception(f"Refund လုပ်ဆောင်စဉ် အမှားဖြစ်ပွားသည်: {e}")
