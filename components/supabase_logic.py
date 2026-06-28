@@ -53,11 +53,12 @@ def process_sale_stock_update(cart):
             supabase.table("products").update({"stock_qty": new_stock}).eq("barcode", barcode).execute()
 
 # components/supabase_logic.py ထဲတွင် ဤ function ကို သေချာစစ်ဆေးပါ
-def sync_to_supabase(pending_sales):
+# components/supabase_logic.py ထဲတွင် ဤအတိုင်း အစားထိုးပါ
+def sync_pending_data(pending_sales):
     """Offline မှရရှိသော Pending Sales များအားလုံးကို Cloud သို့ တင်ပေးခြင်း"""
     if not supabase: raise Exception("Database Connection မရှိပါ။")
     
-    # pending_sales ဆိုတာက list ဖြစ်ရပါမယ်
+    # pending_sales list ကို loop ပတ်၍ အားလုံးကို Insert လုပ်ခြင်း
     for sale in pending_sales:
         insert_sale(
             sale['cart'], 
