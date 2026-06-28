@@ -24,18 +24,19 @@ def setup_page():
 # app.py ၏ auto_sync_on_start function
 from components.supabase_logic import sync_to_supabase
 
+# app.py ၏ auto_sync_on_start()
 def auto_sync_on_start():
-    # pending_sales က list ဟုတ်မဟုတ် စစ်ဆေးခြင်း
+    # Session state ကို စစ်ဆေးပါ
     if "pending_sales" in st.session_state and isinstance(st.session_state.pending_sales, list):
-        pending_data = st.session_state.pending_sales
-        if len(pending_data) > 0:
+        if len(st.session_state.pending_sales) > 0:
             try:
-                # Argument ကို သေချာပို့ပေးခြင်းဖြင့် missing argument error ကို ဖြေရှင်းသည်
-                sync_to_supabase(pending_data)
+                # Import လုပ်ထားသော function ကို ခေါ်ပါ
+                from components.supabase_logic import sync_to_supabase
+                sync_to_supabase(st.session_state.pending_sales)
                 st.session_state.pending_sales = []
-                st.success("✅ Sync အောင်မြင်ပါသည်။")
+                st.success("✅ အားလုံး Sync လုပ်ပြီးပါပြီ။")
             except Exception as e:
-                st.warning(f"Sync မအောင်မြင်ပါ: {e}")
+                st.warning(f"Sync အဆင်မပြေပါ: {e}")
 def main():
     setup_page()
     init_auth_state()
