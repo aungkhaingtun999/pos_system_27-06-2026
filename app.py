@@ -16,8 +16,8 @@ from components.reports import show_reports
 from components.inventory import show_inventory
 from components.profit_loss import show_profit_loss
 from components.refund import show_refund
-from components.receipt_generator import show_receipt 
-from components.supabase_logic import insert_sale_to_supabase
+# အသစ် (ဤသို့ ပြင်ရေးပါ)
+from components.supabase_logic import insert_sale
 
 def setup_page():
     st.set_page_config(
