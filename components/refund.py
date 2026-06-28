@@ -58,13 +58,10 @@ def show_refund():
                 if submitted:
                     if selected_refund_items:
                         try:
-                            # 1. Update status to 'refunded'
-                            supabase.table("sales").update({"status": "refunded"}).eq("id", inv['id']).execute()
+                            # execute_refund ထဲမှာတင် status update နဲ့ refund log အားလုံးပါပြီးသားဖြစ်ပါတယ်
+                            processed_amount = execute_refund(inv, selected_refund_items)
                             
-                            # 2. Execute stock increment and refund logging
-                            execute_refund(inv, selected_refund_items)
-                            
-                            st.session_state.msg = f"✅ Refund of {total_refund_value:,.2f} MMK processed successfully!"
+                            st.session_state.msg = f"✅ Refund of {processed_amount:,.2f} MMK processed successfully!"
                             st.session_state.current_refund_inv = None
                             st.rerun()
                         except Exception as e:
