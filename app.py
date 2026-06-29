@@ -2,14 +2,20 @@ import sys
 import os
 import streamlit as st
 
-# Root directory path
+# ==========================================
+# PATH SETUP
+# ==========================================
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-# Modules
+# ==========================================
+# IMPORTS
+# ==========================================
 from auth import check_password, init_auth_state
 from utils import init_app_state
 from config import init_session
-from components.supabase_logic import sync_to_supabase # Sync function ကို အပေါ်မှာ သေချာ import လုပ်ပါ
+
+from components.supabase_logic import sync_to_supabase
+
 from components.sidebar import show_sidebar
 from components.pos_system import show_pos_system
 from components.reports import show_reports
@@ -18,59 +24,90 @@ from components.profit_loss import show_profit_loss
 from components.refund import show_refund
 from components.receipt import show_receipt
 
+
+# ==========================================
+# PAGE CONFIG (IMPORTANT FIX)
+# ==========================================
 def setup_page():
-    # setup_page မှာ st.set_page_config ကို တစ်ကြိမ်သာ ခေါ်ရပါမယ်
-    if "page_config_set" not in st.session_state:
-        st.set_page_config(page_title="Barcode POS System", layout="wide")
-        st.session_state.page_config_set = True
+    st.set_page_config(
+        page_title="Barcode POS System",
+        layout="wide"
+    )
 
-# app.py တွင် သေချာပြင်ပါ
-from components.supabase_logic import sync_to_supabase
 
+# ==========================================
+# AUTO SYNC (SAFE VERSION)
+# ==========================================
 def auto_sync_on_start():
-    # session_state မှ data ကိုယူပြီးမှ Argument ပို့ပါ
-    pending_data = st.session_state.get("pending_sales", [])
-    
-    if isinstance(pending_data, list) and len(pending_data) > 0:
-        try:
-            # Argument ကို သေချာပို့ပေးပါ
-            sync_to_supabase(pending_data)
-            st.session_state.pending_sales = []
-            st.success("✅ Sync အောင်မြင်ပါသည်။")
-        except Exception as e:
-            st.error(f"Sync Failed: {e}")
 
-# (ကျန်သည့် app.py logic များသည် အရင်အတိုင်းထားပါ)
+    pending_data = st.session_state.get("pending_sales")
+
+    if not pending_data:
+        return
+
+    if not isinstance(pending_data, list):
+        st.session_state.pending_sales = []
+        return
+
+    try:
+        sync_to_supabase(pending_data)
+        st.session_state.pending_sales = []
+        st.success("✅ Cloud Sync အောင်မြင်ပါသည်")
+    except Exception as e:
+        st.warning(f"⚠️ Sync မအောင်မြင်ပါ: {e}")
+
+
+# ==========================================
+# MAIN APP
+# ==========================================
 def main():
+
     setup_page()
+
     init_auth_state()
     init_app_state()
     init_session()
 
-    # Authentication
-    if not check_password(): 
+    # --------------------------
+    # LOGIN CHECK
+    # --------------------------
+    if not check_password():
         st.stop()
-    
-    # Sync လုပ်ဆောင်ခြင်း
-    auto_sync_on_start()
-    
-    # Sidebar
+
+    # --------------------------
+    # SIDEBAR
+    # --------------------------
     show_sidebar()
-    
-    # Page Router
+
+    # --------------------------
+    # MENU ROUTER (FIXED)
+    # --------------------------
     menu_map = {
         "POS System": show_pos_system,
         "Inventory": show_inventory,
         "Reports": show_reports,
-        "Profit & Loss": show_profit_loss, 
+        "Profit & Loss": show_profit_loss,
         "Refund": show_refund,
     }
-    
-    current_menu = st.session_state.get("menu", "POS System")
-    menu_map.get(current_menu, show_pos_system)()
 
-    # Receipt Logic
-    if st.session_state.get("receipt") is not None:
+    current_menu = st.session_state.get("menu")
+
+    # fallback logic (IMPORTANT FIX)
+    if current_menu not in menu_map:
+        current_menu = "POS System"
+
+    menu_map[current_menu]()
+
+    # --------------------------
+    # AUTO SYNC AFTER LOGIN
+    # --------------------------
+    auto_sync_on_start()
+
+    # --------------------------
+    # RECEIPT VIEW
+    # --------------------------
+    if st.session_state.get("receipt"):
+
         show_receipt(
             data=st.session_state.receipt,
             totals=st.session_state.receipt_totals,
@@ -78,10 +115,15 @@ def main():
             payment_method=st.session_state.get("current_payment_method", "Cash"),
             customer=st.session_state.get("current_customer", "Walk-in")
         )
-        if st.button("Close Receipt"):
+
+        if st.button("🧾 Close Receipt"):
             st.session_state.receipt = None
             st.session_state.receipt_totals = None
             st.rerun()
 
+
+# ==========================================
+# RUN
+# ==========================================
 if __name__ == "__main__":
     main()
