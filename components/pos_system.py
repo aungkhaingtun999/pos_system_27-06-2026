@@ -6,17 +6,22 @@ from datetime import datetime
 from database import save_sale
 from utils import show_receipt
 from products import get_products_cached
-from cart import add_to_cart, remove_from_cart, calculate_total
+from cart import (
+    add_to_cart,
+    remove_from_cart,
+    calculate_total
+)
 
 
-# Supabase
-from components.supabase_logic import sync_to_supabase
+from components.supabase_logic import (
+    sync_to_supabase
+)
 
 
-# Stock
 from components.stock_logic import (
     process_sale_stock_update
 )
+
 
 
 # ==========================================
@@ -44,13 +49,10 @@ def _generate_receipt_no():
 
 
 
-
 # ==========================================
-# CHECKOUT PROCESS
+# CHECKOUT
 # ==========================================
-process_sale_stock_update(cart)
 
-save_sale(...)
 def _process_checkout(
         cart,
         totals,
@@ -58,7 +60,9 @@ def _process_checkout(
         customer_name
 ):
 
+
     receipt_no = _generate_receipt_no()
+
 
     customer = (
         customer_name
@@ -69,9 +73,8 @@ def _process_checkout(
 
     try:
 
-        # =========================
-        # 1. Save Local Sale
-        # =========================
+
+        # 1. Save Local
 
         save_sale(
 
@@ -88,22 +91,21 @@ def _process_checkout(
         )
 
 
-        # =========================
+
         # 2. Reduce Stock
-        # =========================
 
         process_sale_stock_update(
             cart
         )
 
 
-        # =========================
+
         # 3. Pending Cloud Sync
-        # =========================
 
         if "pending_sales" not in st.session_state:
 
             st.session_state.pending_sales=[]
+
 
 
         st.session_state.pending_sales.append({
@@ -121,11 +123,13 @@ def _process_checkout(
         })
 
 
+
         return receipt_no, customer
 
 
 
     except Exception as e:
+
 
         raise Exception(
             f"Checkout Failed : {e}"
@@ -136,9 +140,8 @@ def _process_checkout(
 
 
 # ==========================================
-# POS UI
+# MAIN POS
 # ==========================================
-
 
 def show_pos_system():
 
@@ -146,22 +149,36 @@ def show_pos_system():
     st.title(
         "💰 POS System"
     )
+
+
+
+    # ==========================
+    # INIT SESSION
+    # ==========================
+
+
     if "barcode_input" not in st.session_state:
-    st.session_state.barcode_input = ""
+
+        st.session_state.barcode_input=""
 
 
-if "cart" not in st.session_state:
-    st.session_state.cart = []
+    if "cart" not in st.session_state:
+
+        st.session_state.cart=[]
 
 
-if "prod_select" not in st.session_state:
-    st.session_state.prod_select = ""
+    if "prod_select" not in st.session_state:
+
+        st.session_state.prod_select=""
+
+
 
 
 
     # ==========================
-    # Pending Sync
+    # SYNC
     # ==========================
+
 
     if st.session_state.get(
         "pending_sales"
@@ -169,20 +186,26 @@ if "prod_select" not in st.session_state:
 
 
         st.warning(
+
             f"⚠️ Sync မလုပ်ရသေးသော အရောင်း "
-            f"{len(st.session_state.pending_sales)} ခု ရှိသည်"
+            f"{len(st.session_state.pending_sales)} ခု"
+
         )
 
 
+
         if st.button(
-            "🔄 Sync With Cloud"
+            "🔄 Sync Cloud"
         ):
 
 
             try:
 
+
                 sync_to_supabase(
+
                     st.session_state.pending_sales
+
                 )
 
 
@@ -190,7 +213,7 @@ if "prod_select" not in st.session_state:
 
 
                 st.success(
-                    "✅ Cloud Sync အောင်မြင်ပါသည်"
+                    "✅ Sync အောင်မြင်ပါသည်"
                 )
 
 
@@ -210,10 +233,13 @@ if "prod_select" not in st.session_state:
 
 
     # ==========================
-    # Receipt
+    # RECEIPT
     # ==========================
 
-    if st.session_state.get("receipt"):
+
+    if st.session_state.get(
+        "receipt"
+    ):
 
 
         show_receipt(
@@ -237,7 +263,6 @@ if "prod_select" not in st.session_state:
         )
 
 
-
         if st.button(
             "🖨️ Close Receipt"
         ):
@@ -256,7 +281,7 @@ if "prod_select" not in st.session_state:
 
 
     # ==========================
-    # PRODUCT LOAD
+    # PRODUCTS
     # ==========================
 
 
@@ -273,7 +298,6 @@ if "prod_select" not in st.session_state:
 
 
 
-
     product_map={
 
         str(x.get("barcode")):x
@@ -286,82 +310,52 @@ if "prod_select" not in st.session_state:
 
     product_options={
 
-        f"{x['product_name']} | {_get_product_price(x):,.0f} MMK":
 
-            x
+        f"{x.get('product_name')} | "
+        f"{_get_product_price(x):,.0f} MMK":
 
-        for x in products
-
-    }
-
-
-
-
-
-    # Barcode
-
-    def barcode_add():
-
-    code = str(
-        st.session_state.get(
-            "barcode_input",
-            ""
-        )
-    ).strip()
-
-
-    if not code:
-        return
-
-
-    products = get_products_cached()
-
-
-    mapping = {
-
-        str(x.get("barcode")):x
+        x
 
         for x in products
 
     }
 
 
-    if code in mapping:
 
 
-        if "cart" not in st.session_state:
-
-            st.session_state.cart=[]
-
-
-        st.session_state.cart = add_to_cart(
-
-            st.session_state.cart,
-
-            mapping[code]
-
-        )
+    # ==========================
+    # BARCODE
+    # ==========================
 
 
-    st.session_state.barcode_input=""
+    st.text_input(
 
+        "🔫 Barcode Scan",
+
+        key="barcode_input",
+
+        on_change=barcode_add
+
+    )
 
 
 
 
-    # Search
+    # ==========================
+    # SEARCH
+    # ==========================
+
 
     st.selectbox(
 
         "🔍 Product Search",
 
-        [""]+list(product_options.keys()),
+        [""] + list(product_options.keys()),
 
         key="prod_select",
 
         on_change=lambda:
-
-        search_add(product_options)
+            search_add(product_options)
 
     )
 
@@ -369,14 +363,11 @@ if "prod_select" not in st.session_state:
 
 
 
-    if "cart" not in st.session_state:
 
-        st.session_state.cart=[]
+    # ==========================
+    # CART
+    # ==========================
 
-
-
-
-    # Cart
 
     for i,item in enumerate(
         st.session_state.cart
@@ -393,6 +384,7 @@ if "prod_select" not in st.session_state:
         )
 
 
+
         item["qty"]=c2.number_input(
 
             "Qty",
@@ -406,13 +398,14 @@ if "prod_select" not in st.session_state:
         )
 
 
+
         if c3.button(
             "❌",
-            key=f"del_{i}"
+            key=f"delete_{i}"
         ):
 
 
-            st.session_state.cart=remove_from_cart(
+            st.session_state.cart = remove_from_cart(
 
                 st.session_state.cart,
 
@@ -420,31 +413,35 @@ if "prod_select" not in st.session_state:
 
             )
 
-
             st.rerun()
 
 
 
 
 
+    # ==========================
+    # CHECKOUT
+    # ==========================
+
+
     if st.session_state.cart:
 
 
-        tax_rate=st.number_input(
+        tax_rate = st.number_input(
             "Tax %",
-            0.0
-        )/100
+            value=0.0
+        ) / 100
 
 
 
-        discount=st.number_input(
+        discount = st.number_input(
             "Discount",
-            0
+            value=0
         )
 
 
 
-        totals=calculate_total(
+        totals = calculate_total(
 
             st.session_state.cart,
 
@@ -455,9 +452,11 @@ if "prod_select" not in st.session_state:
         )
 
 
+
         st.subheader(
 
-            f"Grand Total : {totals['grand_total']:,.0f} MMK"
+            f"Grand Total : "
+            f"{totals['grand_total']:,.0f} MMK"
 
         )
 
@@ -476,11 +475,9 @@ if "prod_select" not in st.session_state:
         )
 
 
-
         customer=st.text_input(
             "👤 Customer"
         )
-
 
 
 
@@ -505,6 +502,7 @@ if "prod_select" not in st.session_state:
                 )
 
 
+
                 st.session_state.update({
 
                     "receipt":
@@ -527,7 +525,6 @@ if "prod_select" not in st.session_state:
                 })
 
 
-
                 st.success(
                     "✅ အရောင်းအောင်မြင်ပါသည်"
                 )
@@ -548,19 +545,32 @@ if "prod_select" not in st.session_state:
 
 
 
-
 # ==========================================
 # BARCODE FUNCTION
 # ==========================================
 
 def barcode_add():
 
+
     code=str(
-        st.session_state.barcode_input
-    )
+
+        st.session_state.get(
+            "barcode_input",
+            ""
+        )
+
+    ).strip()
+
+
+
+    if not code:
+
+        return
+
 
 
     products=get_products_cached()
+
 
 
     mapping={
@@ -576,7 +586,7 @@ def barcode_add():
     if code in mapping:
 
 
-        st.session_state.cart=add_to_cart(
+        st.session_state.cart = add_to_cart(
 
             st.session_state.cart,
 
@@ -585,21 +595,37 @@ def barcode_add():
         )
 
 
+    else:
+
+        st.warning(
+            "Barcode မတွေ့ပါ"
+        )
+
+
+
     st.session_state.barcode_input=""
 
 
 
 
+
+
+# ==========================================
+# SEARCH FUNCTION
+# ==========================================
+
 def search_add(product_options):
 
 
-    selected=st.session_state.prod_select
+    selected = st.session_state.get(
+        "prod_select"
+    )
 
 
     if selected:
 
 
-        st.session_state.cart=add_to_cart(
+        st.session_state.cart = add_to_cart(
 
             st.session_state.cart,
 
