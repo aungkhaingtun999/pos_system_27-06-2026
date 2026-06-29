@@ -92,18 +92,23 @@ def main():
     "User Management": show_user_management,   # ✅ ADD THIS
 }
 
-    current_menu = st.session_state.get("menu")
+    # ==========================
+# MENU ROUTER
+# ==========================
 
-    # fallback logic (IMPORTANT FIX)
-    current_menu = st.session_state.get("menu", "POS System")
+current_menu = st.session_state.get(
+    "menu",
+    "POS System"
+)
 
 if current_menu not in menu_map:
-    # ❌ auto fallback မလုပ်ပါနဲ့
-    st.error(f"Menu not found: {current_menu}")
+    st.warning(
+        f"Unknown menu: {current_menu}. POS System သို့ ပြန်သွားပါမည်။"
+    )
     current_menu = "POS System"
 
-    menu_map[current_menu]()
 
+menu_map[current_menu]()
     # --------------------------
     # AUTO SYNC AFTER LOGIN
     # --------------------------
