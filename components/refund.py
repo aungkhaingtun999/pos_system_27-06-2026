@@ -1,17 +1,25 @@
 import streamlit as st
-import json
+import uuid
+from datetime import datetime
+
+from database import save_sale
+from utils import show_receipt
+from products import get_products_cached
+from cart import add_to_cart, remove_from_cart, calculate_total
+
+
+# ==========================================
+# STOCK LOGIC IMPORT
+# ==========================================
+
+from components.stock_logic import (
+    process_sale_stock_update
+)
 
 
 from components.supabase_logic import (
-    supabase,
-    execute_refund
+    sync_to_supabase
 )
-
-
-from components.stock_logic import (
-    process_refund_stock_update
-)
-
 
 
 # =====================================================
