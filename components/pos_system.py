@@ -9,23 +9,14 @@ from products import get_products_cached
 from cart import add_to_cart, remove_from_cart, calculate_total
 
 
-# ==============================
-# SUPABASE
-# ==============================
-
-from components.supabase_logic import (
-    sync_to_supabase
-)
+# Supabase
+from components.supabase_logic import sync_to_supabase
 
 
-# ==============================
-# STOCK
-# ==============================
-
+# Stock
 from components.stock_logic import (
     process_sale_stock_update
 )
-
 
 
 # ==========================================
@@ -57,7 +48,9 @@ def _generate_receipt_no():
 # ==========================================
 # CHECKOUT PROCESS
 # ==========================================
+process_sale_stock_update(cart)
 
+save_sale(...)
 def _process_checkout(
         cart,
         totals,
@@ -65,9 +58,7 @@ def _process_checkout(
         customer_name
 ):
 
-
     receipt_no = _generate_receipt_no()
-
 
     customer = (
         customer_name
@@ -78,20 +69,9 @@ def _process_checkout(
 
     try:
 
-
-        # ----------------------------
-        # 1. Stock လျှော့
-        # ----------------------------
-
-        process_sale_stock_update(
-            cart
-        )
-
-
-
-        # ----------------------------
-        # 2. Local Save
-        # ----------------------------
+        # =========================
+        # 1. Save Local Sale
+        # =========================
 
         save_sale(
 
@@ -108,15 +88,22 @@ def _process_checkout(
         )
 
 
+        # =========================
+        # 2. Reduce Stock
+        # =========================
 
-        # ----------------------------
-        # 3. Cloud Pending
-        # ----------------------------
+        process_sale_stock_update(
+            cart
+        )
+
+
+        # =========================
+        # 3. Pending Cloud Sync
+        # =========================
 
         if "pending_sales" not in st.session_state:
 
             st.session_state.pending_sales=[]
-
 
 
         st.session_state.pending_sales.append({
@@ -134,18 +121,15 @@ def _process_checkout(
         })
 
 
-
         return receipt_no, customer
 
 
 
     except Exception as e:
 
-
         raise Exception(
             f"Checkout Failed : {e}"
         )
-
 
 
 
@@ -162,6 +146,16 @@ def show_pos_system():
     st.title(
         "💰 POS System"
     )
+    if "barcode_input" not in st.session_state:
+    st.session_state.barcode_input = ""
+
+
+if "cart" not in st.session_state:
+    st.session_state.cart = []
+
+
+if "prod_select" not in st.session_state:
+    st.session_state.prod_select = ""
 
 
 
@@ -306,17 +300,50 @@ def show_pos_system():
 
     # Barcode
 
-    st.text_input(
+    def barcode_add():
 
-        "🔫 Barcode Scan",
+    code = str(
+        st.session_state.get(
+            "barcode_input",
+            ""
+        )
+    ).strip()
 
-        key="barcode_input",
 
-        on_change=lambda:
+    if not code:
+        return
 
-        barcode_add()
 
-    )
+    products = get_products_cached()
+
+
+    mapping = {
+
+        str(x.get("barcode")):x
+
+        for x in products
+
+    }
+
+
+    if code in mapping:
+
+
+        if "cart" not in st.session_state:
+
+            st.session_state.cart=[]
+
+
+        st.session_state.cart = add_to_cart(
+
+            st.session_state.cart,
+
+            mapping[code]
+
+        )
+
+
+    st.session_state.barcode_input=""
 
 
 
