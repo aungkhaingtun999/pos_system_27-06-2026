@@ -130,7 +130,7 @@ def show_sidebar():
         current_menu = st.session_state.get("menu", "POS System")
 
         if current_menu not in menu_items:
-            current_menu = "POS System"
+            menu_items.append(current_menu)
             st.session_state.menu = current_menu   # FIX: state sync
 
 
