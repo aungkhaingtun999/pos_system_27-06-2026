@@ -1,60 +1,295 @@
 import streamlit as st
-from supabase import create_client
 
-# Supabase ချိတ်ဆက်ခြင်း
-supabase = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
+from components.supabase_logic import supabase
+
+
+
+# ==========================================
+# USER MANAGEMENT
+# ==========================================
 
 def show_user_management():
-    st.subheader("👥 User Management (Admin Only)")
-    
-    # 1. User အသစ်ထည့်ခြင်း
-    with st.expander("➕ User အသစ်ထည့်ရန်"):
-        with st.form("add_user_form", clear_on_submit=True):
-            new_user = st.text_input("Username")
-            new_pass = st.text_input("Password", type="password")
-            role = st.selectbox("Role", ["Admin", "Inventory Manager", "Cashier"])
-            submitted = st.form_submit_button("Create User")
-            
-            if submitted:
-                if new_user and new_pass:
-                    data = {"username": new_user, "password": new_pass, "role": role}
-                    try:
-                        supabase.table("users").insert(data).execute()
-                        st.success(f"User {new_user} ကို ထည့်သွင်းပြီးပါပြီ။")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error: {e}")
+
+    st.title(
+        "👥 User Management"
+    )
+
+
+    # Database Check
+
+    if supabase is None:
+
+        st.error(
+            "Supabase Connection မရှိပါ"
+        )
+
+        return
+
+
+
+    # ======================================
+    # ADD USER
+    # ======================================
+
+    with st.expander(
+        "➕ User အသစ်ထည့်ရန်"
+    ):
+
+
+        with st.form(
+            "add_user_form"
+        ):
+
+
+            username = st.text_input(
+                "Username"
+            )
+
+
+            password = st.text_input(
+                "Password",
+                type="password"
+            )
+
+
+            role = st.selectbox(
+
+                "Role",
+
+                [
+                    "Admin",
+                    "Inventory Manager",
+                    "Cashier"
+                ]
+
+            )
+
+
+            submit = st.form_submit_button(
+                "Create User"
+            )
+
+
+
+            if submit:
+
+
+                if not username or not password:
+
+
+                    st.warning(
+                        "Username နှင့် Password ဖြည့်ပါ"
+                    )
+
+                    return
+
+
+
+                try:
+
+
+                    supabase.table(
+                        "users"
+                    ).insert({
+
+                        "username":username,
+
+                        "password":password,
+
+                        "role":role
+
+                    }).execute()
+
+
+
+                    st.success(
+                        "User ထည့်ပြီးပါပြီ"
+                    )
+
+
+                    st.rerun()
+
+
+
+                except Exception as e:
+
+
+                    st.error(
+                        f"Create User Error : {e}"
+                    )
+
+
+
 
     st.divider()
-    
-    # 2. လက်ရှိ User များကို ပြသခြင်း
+
+
+
+    # ======================================
+    # USER LIST
+    # ======================================
+
     try:
-        response = supabase.table("users").select("*").execute()
-        users = response.data
-        
-        if users:
-            for index, user in enumerate(users):
-                # Username က None မဖြစ်စေရန် စစ်ဆေးခြင်း
-                uname = user.get('username', 'unknown')
-                # Unique Key အဖြစ် index နှင့် username ကို ပေါင်း၍သုံးခြင်း
-                unique_id = f"{uname}_{index}"
-                
-                col1, col2, col3 = st.columns([2, 1, 1])
-                col1.write(f"👤 **{uname}** ({user.get('role', 'N/A')})")
-                
-                # Password Reset (Unique Key သုံးခြင်း)
-                if col2.button("Reset Pwd", key=f"reset_{unique_id}"):
-                    supabase.table("users").update({"password": "123"}).eq("username", uname).execute()
-                    st.rerun()
-                
-                # User ဖျက်ရန် (Unique Key သုံးခြင်း)
-                if col3.button("Delete", key=f"del_{unique_id}"):
-                    if uname != "admin": 
-                        supabase.table("users").delete().eq("username", uname).execute()
-                        st.rerun()
-                    else:
-                        col3.warning("Admin ကို ဖျက်၍မရပါ။")
-        else:
-            st.info("User စာရင်း မရှိသေးပါ။")
+
+
+        result=(
+
+            supabase
+            .table("users")
+            .select("*")
+            .order(
+                "id",
+                desc=True
+            )
+            .execute()
+
+        )
+
+
+        users=result.data or []
+
+
+
     except Exception as e:
-        st.error(f"Database Error: {e}")
+
+
+        st.error(
+            f"Load User Error : {e}"
+        )
+
+        return
+
+
+
+
+
+    if not users:
+
+
+        st.info(
+            "User မရှိသေးပါ"
+        )
+
+        return
+
+
+
+
+
+
+    # ======================================
+    # DISPLAY USER
+    # ======================================
+
+
+    for user in users:
+
+
+        username=user.get(
+            "username",
+            ""
+        )
+
+
+        role=user.get(
+            "role",
+            ""
+        )
+
+
+        uid=user.get(
+            "id"
+        )
+
+
+
+        c1,c2,c3=st.columns(
+            [3,1,1]
+        )
+
+
+
+        c1.write(
+            f"👤 {username} ({role})"
+        )
+
+
+
+        if c2.button(
+
+            "🔑 Reset",
+
+            key=f"reset_{uid}"
+
+        ):
+
+
+            try:
+
+                supabase.table(
+                    "users"
+                ).update({
+
+                    "password":"123"
+
+                }).eq(
+
+                    "id",
+                    uid
+
+                ).execute()
+
+
+
+                st.success(
+                    "Password Reset = 123"
+                )
+
+                st.rerun()
+
+
+            except Exception as e:
+
+                st.error(e)
+
+
+
+
+
+
+        if c3.button(
+
+            "🗑 Delete",
+
+            key=f"delete_{uid}"
+
+        ):
+
+
+
+            if username.lower()=="admin":
+
+
+                st.warning(
+                    "Admin ကို ဖျက်၍မရပါ"
+                )
+
+
+            else:
+
+
+                supabase.table(
+                    "users"
+                ).delete().eq(
+
+                    "id",
+                    uid
+
+                ).execute()
+
+
+                st.success(
+                    "User ဖျက်ပြီးပါပြီ"
+                )
+
+                st.rerun()
