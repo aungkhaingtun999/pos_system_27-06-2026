@@ -23,6 +23,7 @@ from components.inventory import show_inventory
 from components.profit_loss import show_profit_loss
 from components.refund import show_refund
 from components.receipt import show_receipt
+from components.user_management import show_user_management
 
 
 # ==========================================
@@ -83,18 +84,23 @@ def main():
     # MENU ROUTER (FIXED)
     # --------------------------
     menu_map = {
-        "POS System": show_pos_system,
-        "Inventory": show_inventory,
-        "Reports": show_reports,
-        "Profit & Loss": show_profit_loss,
-        "Refund": show_refund,
-    }
+    "POS System": show_pos_system,
+    "Inventory": show_inventory,
+    "Reports": show_reports,
+    "Profit & Loss": show_profit_loss,
+    "Refund": show_refund,
+    "User Management": show_user_management,   # ✅ ADD THIS
+}
 
     current_menu = st.session_state.get("menu")
 
     # fallback logic (IMPORTANT FIX)
-    if current_menu not in menu_map:
-        current_menu = "POS System"
+    current_menu = st.session_state.get("menu", "POS System")
+
+if current_menu not in menu_map:
+    # ❌ auto fallback မလုပ်ပါနဲ့
+    st.error(f"Menu not found: {current_menu}")
+    current_menu = "POS System"
 
     menu_map[current_menu]()
 
