@@ -1,30 +1,30 @@
 import streamlit as st
-import uuid
-from datetime import datetime
-
-from database import save_sale
-from utils import show_receipt
-from products import get_products_cached
-from cart import add_to_cart, remove_from_cart, calculate_total
+import json
 
 
-# ==========================================
-# STOCK LOGIC IMPORT
-# ==========================================
-
-from components.stock_logic import (
-    process_sale_stock_update
-)
-
+# =============================================
+# IMPORT DATABASE
+# =============================================
 
 from components.supabase_logic import (
-    sync_to_supabase
+    supabase,
+    execute_refund
 )
 
 
-# =====================================================
+# =============================================
+# STOCK
+# =============================================
+
+from components.stock_logic import (
+    process_refund_stock_update
+)
+
+
+
+# =============================================
 # SAFE NUMBER
-# =====================================================
+# =============================================
 
 def safe_float(value):
 
@@ -34,9 +34,9 @@ def safe_float(value):
             return 0.0
 
 
-        if isinstance(value, str):
+        if isinstance(value,str):
 
-            value = value.replace(",", "")
+            value=value.replace(",","")
 
 
         return float(value)
@@ -49,10 +49,9 @@ def safe_float(value):
 
 
 
-
-# =====================================================
-# GET PRICE
-# =====================================================
+# =============================================
+# GET ITEM PRICE
+# =============================================
 
 def get_item_price(item):
 
@@ -75,10 +74,9 @@ def get_item_price(item):
 
 
 
-
-# =====================================================
-# GET QTY
-# =====================================================
+# =============================================
+# GET ITEM QTY
+# =============================================
 
 def get_item_qty(item):
 
@@ -88,13 +86,9 @@ def get_item_qty(item):
 
             item.get("qty")
 
-            or
+            or item.get("quantity")
 
-            item.get("quantity")
-
-            or
-
-            1
+            or 1
 
         )
 
@@ -106,9 +100,9 @@ def get_item_qty(item):
 
 
 
-# =====================================================
+# =============================================
 # REFUND PAGE
-# =====================================================
+# =============================================
 
 def show_refund():
 
@@ -119,35 +113,29 @@ def show_refund():
 
 
 
-    # =============================================
+    # =========================================
     # SUCCESS MESSAGE
-    # =============================================
+    # =========================================
 
     if "refund_success" in st.session_state:
 
 
         st.success(
-
-            st.session_state[
-                "refund_success"
-            ]
-
+            st.session_state["refund_success"]
         )
 
 
-        del st.session_state[
-            "refund_success"
-        ]
+        del st.session_state["refund_success"]
 
 
 
 
 
-    # =============================================
+    # =========================================
     # DATABASE CHECK
-    # =============================================
+    # =========================================
 
-    if not supabase:
+    if supabase is None:
 
 
         st.error(
@@ -160,14 +148,14 @@ def show_refund():
 
 
 
-    # =============================================
+    # =========================================
     # LOAD SALES
-    # =============================================
+    # =========================================
 
     try:
 
 
-        response = (
+        result=(
 
             supabase
             .table("sales")
@@ -181,7 +169,7 @@ def show_refund():
         )
 
 
-        sales = response.data or []
+        sales=result.data or []
 
 
 
@@ -193,6 +181,7 @@ def show_refund():
         )
 
         return
+
 
 
 
@@ -211,42 +200,38 @@ def show_refund():
 
 
 
-    # =============================================
+
+    # =========================================
     # RECEIPT SELECT
-    # =============================================
+    # =========================================
 
-
-    receipt_map = {}
+    receipt_map={}
 
 
 
     for sale in sales:
 
 
-        label = (
-
-            f"📄 {sale.get('receipt_no')}"
-
-        )
+        label=f"📄 {sale.get('receipt_no')}"
 
 
-        if sale.get("status") == "refunded":
+        if sale.get("status")=="refunded":
 
             label += " ✅ REFUNDED"
 
 
 
-        receipt_map[label] = sale
+        receipt_map[label]=sale
 
 
 
 
 
-    selected = st.selectbox(
+    selected=st.selectbox(
 
         "🔍 Select Receipt",
 
-        [""] + list(receipt_map.keys())
+        [""]+list(receipt_map.keys())
 
     )
 
@@ -261,22 +246,22 @@ def show_refund():
 
 
 
-    invoice = receipt_map[selected]
+    invoice=receipt_map[selected]
 
 
 
 
 
-    # =============================================
-    # ALREADY REFUNDED
-    # =============================================
+    # =========================================
+    # BLOCK REFUNDED
+    # =========================================
 
-    if invoice.get("status") == "refunded":
+    if invoice.get("status")=="refunded":
 
 
         st.warning(
 
-            "⚠️ ဒီ Receipt ကို Refund ပြီးသားဖြစ်ပါသည်။"
+            "⚠️ ဒီ Receipt ကို Refund လုပ်ပြီးသားဖြစ်ပါသည်"
 
         )
 
@@ -286,12 +271,11 @@ def show_refund():
 
 
 
-    # =============================================
-    # LOAD ITEMS
-    # =============================================
+    # =========================================
+    # LOAD ITEM
+    # =========================================
 
-
-    raw_items = invoice.get(
+    raw_items=invoice.get(
         "item",
         []
     )
@@ -303,11 +287,12 @@ def show_refund():
 
         if isinstance(raw_items,str):
 
-            items = json.loads(raw_items)
+            items=json.loads(raw_items)
+
 
         else:
 
-            items = raw_items
+            items=raw_items
 
 
 
@@ -315,7 +300,7 @@ def show_refund():
 
 
         st.error(
-            "Item Data Error"
+            "Item Data ဖတ်၍မရပါ"
         )
 
         return
@@ -337,6 +322,7 @@ def show_refund():
 
 
 
+
     st.subheader(
 
         f"📋 Receipt : {invoice.get('receipt_no')}"
@@ -347,66 +333,57 @@ def show_refund():
 
 
 
-    selected_items = []
 
-    refund_total = 0
+    selected_items=[]
 
-
-
+    refund_total=0
 
 
-    # =============================================
+
+
+
+    # =========================================
     # ITEM LIST
-    # =============================================
+    # =========================================
+
+    for i,item in enumerate(items):
 
 
-    for index,item in enumerate(items):
+        qty=get_item_qty(item)
 
 
-        qty = get_item_qty(item)
+        price=get_item_price(item)
 
 
-        price = get_item_price(item)
-
-
-
-        name = item.get(
-
+        name=item.get(
             "product_name",
-
-            "Unknown Item"
-
+            "Unknown"
         )
 
 
 
-        c1,c2,c3 = st.columns(
+        c1,c2,c3=st.columns(
             [0.5,0.25,0.25]
         )
 
 
 
-        checked = c1.checkbox(
+        checked=c1.checkbox(
 
             name,
 
-            key=f"refund_{invoice['id']}_{index}"
+            key=f"refund_{invoice.get('id')}_{i}"
 
         )
 
 
-
         c2.write(
-
             f"Qty : {qty}"
-
         )
 
 
         c3.write(
-
             f"{price:,.0f} MMK"
-
         )
 
 
@@ -418,11 +395,7 @@ def show_refund():
             selected_items.append(item)
 
 
-            refund_total += (
-
-                qty * price
-
-            )
+            refund_total += qty * price
 
 
 
@@ -443,10 +416,10 @@ def show_refund():
 
 
 
-    # =============================================
-    # CONFIRM
-    # =============================================
 
+    # =========================================
+    # CONFIRM
+    # =========================================
 
     if st.button(
 
@@ -470,26 +443,15 @@ def show_refund():
 
 
 
-        if refund_total <= 0:
-
-
-            st.error(
-                "Refund Amount 0 ဖြစ်နေပါသည်"
-            )
-
-            return
-
-
-
-
 
         try:
 
 
+            # =============================
+            # 1. Refund Table Insert
+            # =============================
 
-            # 1. Refund Database
-
-            amount = execute_refund(
+            amount=execute_refund(
 
                 invoice,
 
@@ -502,44 +464,31 @@ def show_refund():
 
 
 
+            # =============================
+            # 2. Return Stock
+            # =============================
 
-            # 2. Stock Return
+            process_refund_stock_update(
 
-            try:
+                selected_items
 
-
-                process_refund_stock_update(
-
-                    selected_items
-
-                )
-
-
-            except Exception as stock_error:
-
-
-                st.warning(
-
-                    f"Stock Update Warning : {stock_error}"
-
-                )
+            )
 
 
 
 
+            # =============================
+            # SUCCESS
+            # =============================
 
-            # 3. Success Message
 
-
-            st.session_state[
-                "refund_success"
-            ] = (
+            st.session_state["refund_success"]=(
 
                 "✅ Refund အောင်မြင်ပါသည်\n\n"
 
                 f"📄 Receipt : {invoice.get('receipt_no')}\n"
 
-                f"💰 Amount : {amount:,.2f} MMK\n"
+                f"💰 Amount : {amount:,.2f} MMK\n\n"
 
                 "📦 Stock ပြန်တိုးပြီးပါပြီ"
 
@@ -548,7 +497,6 @@ def show_refund():
 
 
             st.rerun()
-
 
 
 
