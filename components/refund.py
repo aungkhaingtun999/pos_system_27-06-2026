@@ -1,15 +1,21 @@
 import streamlit as st
 import json
 
+
 from components.supabase_logic import (
     supabase,
     execute_refund
 )
 
 
+from components.stock_logic import (
+    process_refund_stock_update
+)
+
+
 
 # =====================================================
-# NUMBER FORMAT
+# SAFE NUMBER
 # =====================================================
 
 def safe_float(value):
@@ -37,203 +43,40 @@ def safe_float(value):
 
 
 # =====================================================
-# REFUND PAGE
+# GET PRICE
 # =====================================================
 
-def show_refund():
+def get_item_price(item):
 
-    st.title(
-        "🔄 Refund Manager"
+    return safe_float(
+
+        item.get("sell_price")
+
+        or item.get("selling_price")
+
+        or item.get("unit_price")
+
+        or item.get("price")
+
+        or item.get("amount")
+
+        or 0
+
     )
 
 
-    # ==========================================
-    # SUCCESS MESSAGE
-    # ==========================================
-
-    if "refund_success" in st.session_state:
-
-        st.success(
-            st.session_state["refund_success"]
-        )
-
-        del st.session_state["refund_success"]
 
 
 
+# =====================================================
+# GET QTY
+# =====================================================
 
-    # ==========================================
-    # LOAD SALES
-    # ==========================================
+def get_item_qty(item):
 
     try:
 
-        response = (
-            supabase
-            .table("sales")
-            .select("*")
-            .order(
-                "id",
-                desc=True
-            )
-            .execute()
-        )
-
-
-        sales_data = response.data or []
-
-
-    except Exception as e:
-
-        st.error(
-            f"Database Error : {e}"
-        )
-
-        return
-
-
-
-
-
-    if not sales_data:
-
-        st.info(
-            "Sales record မရှိပါ"
-        )
-
-        return
-
-
-
-
-
-    # ==========================================
-    # RECEIPT SELECT
-    # ==========================================
-
-    options = {}
-
-
-    for sale in sales_data:
-
-
-        label = (
-            f"📄 {sale.get('receipt_no')}"
-        )
-
-
-        if sale.get("status") == "refunded":
-
-            label += " [REFUNDED]"
-
-
-        options[label] = sale
-
-
-
-
-
-    selected = st.selectbox(
-
-        "🔍 Select Receipt",
-
-        [""] + list(options.keys())
-
-    )
-
-
-
-    if not selected:
-
-        return
-
-
-
-
-    inv = options[selected]
-
-
-
-
-
-    # ==========================================
-    # BLOCK ALREADY REFUNDED
-    # ==========================================
-
-    if inv.get("status") == "refunded":
-
-
-        st.error(
-            "⚠️ ဒီ Receipt ကို Refund လုပ်ပြီးသားဖြစ်ပါသည်။"
-        )
-
-        return
-
-
-
-
-
-    # ==========================================
-    # LOAD ITEMS
-    # ==========================================
-
-    raw_items = inv.get(
-        "item",
-        []
-    )
-
-
-
-    try:
-
-        if isinstance(raw_items, str):
-
-            items = json.loads(raw_items)
-
-        else:
-
-            items = raw_items
-
-
-    except:
-
-
-        st.error(
-            "Item Data ဖတ်၍မရပါ"
-        )
-
-        return
-
-
-
-
-
-    st.subheader(
-
-        f"📋 {inv.get('receipt_no')}"
-
-    )
-
-
-
-
-
-    selected_items = []
-
-    refund_total = 0.0
-
-
-
-
-
-    # ==========================================
-    # ITEM LIST
-    # ==========================================
-
-    for i, item in enumerate(items):
-
-
-        qty = int(
+        return int(
 
             item.get("qty")
 
@@ -247,76 +90,330 @@ def show_refund():
 
         )
 
+    except:
+
+        return 1
 
 
-        price = safe_float(
 
-            item.get("sell_price")
 
-            or
 
-            item.get("selling_price")
+# =====================================================
+# REFUND PAGE
+# =====================================================
 
-            or
+def show_refund():
 
-            item.get("unit_price")
 
-            or
+    st.title(
+        "🔄 Refund Manager"
+    )
 
-            item.get("price")
 
-            or
 
-            item.get("amount")
+    # =============================================
+    # SUCCESS MESSAGE
+    # =============================================
 
-            or
+    if "refund_success" in st.session_state:
 
-            0
+
+        st.success(
+
+            st.session_state[
+                "refund_success"
+            ]
+
+        )
+
+
+        del st.session_state[
+            "refund_success"
+        ]
+
+
+
+
+
+    # =============================================
+    # DATABASE CHECK
+    # =============================================
+
+    if not supabase:
+
+
+        st.error(
+            "Database Connection မရှိပါ"
+        )
+
+        return
+
+
+
+
+
+    # =============================================
+    # LOAD SALES
+    # =============================================
+
+    try:
+
+
+        response = (
+
+            supabase
+            .table("sales")
+            .select("*")
+            .order(
+                "id",
+                desc=True
+            )
+            .execute()
+
+        )
+
+
+        sales = response.data or []
+
+
+
+    except Exception as e:
+
+
+        st.error(
+            f"Sales Load Error : {e}"
+        )
+
+        return
+
+
+
+
+
+    if not sales:
+
+
+        st.info(
+            "Sales Record မရှိပါ"
+        )
+
+        return
+
+
+
+
+
+    # =============================================
+    # RECEIPT SELECT
+    # =============================================
+
+
+    receipt_map = {}
+
+
+
+    for sale in sales:
+
+
+        label = (
+
+            f"📄 {sale.get('receipt_no')}"
+
+        )
+
+
+        if sale.get("status") == "refunded":
+
+            label += " ✅ REFUNDED"
+
+
+
+        receipt_map[label] = sale
+
+
+
+
+
+    selected = st.selectbox(
+
+        "🔍 Select Receipt",
+
+        [""] + list(receipt_map.keys())
+
+    )
+
+
+
+
+
+    if not selected:
+
+        return
+
+
+
+
+    invoice = receipt_map[selected]
+
+
+
+
+
+    # =============================================
+    # ALREADY REFUNDED
+    # =============================================
+
+    if invoice.get("status") == "refunded":
+
+
+        st.warning(
+
+            "⚠️ ဒီ Receipt ကို Refund ပြီးသားဖြစ်ပါသည်။"
+
+        )
+
+        return
+
+
+
+
+
+    # =============================================
+    # LOAD ITEMS
+    # =============================================
+
+
+    raw_items = invoice.get(
+        "item",
+        []
+    )
+
+
+
+    try:
+
+
+        if isinstance(raw_items,str):
+
+            items = json.loads(raw_items)
+
+        else:
+
+            items = raw_items
+
+
+
+    except:
+
+
+        st.error(
+            "Item Data Error"
+        )
+
+        return
+
+
+
+
+
+    if not items:
+
+
+        st.warning(
+            "ဒီ Receipt မှာ Item မရှိပါ"
+        )
+
+        return
+
+
+
+
+
+    st.subheader(
+
+        f"📋 Receipt : {invoice.get('receipt_no')}"
+
+    )
+
+
+
+
+
+    selected_items = []
+
+    refund_total = 0
+
+
+
+
+
+    # =============================================
+    # ITEM LIST
+    # =============================================
+
+
+    for index,item in enumerate(items):
+
+
+        qty = get_item_qty(item)
+
+
+        price = get_item_price(item)
+
+
+
+        name = item.get(
+
+            "product_name",
+
+            "Unknown Item"
 
         )
 
 
 
-
-        col1, col2, col3 = st.columns(
-            [0.5, 0.25, 0.25]
+        c1,c2,c3 = st.columns(
+            [0.5,0.25,0.25]
         )
 
 
 
-        checked = col1.checkbox(
+        checked = c1.checkbox(
 
-            item.get(
-                "product_name",
-                "Item"
-            ),
+            name,
 
-            key=f"refund_{inv['id']}_{i}"
+            key=f"refund_{invoice['id']}_{index}"
 
         )
 
 
 
-        col2.write(
+        c2.write(
+
             f"Qty : {qty}"
+
         )
 
 
-        col3.write(
+        c3.write(
+
             f"{price:,.0f} MMK"
-        )
 
+        )
 
 
 
 
         if checked:
 
+
             selected_items.append(item)
 
 
             refund_total += (
+
                 qty * price
+
             )
 
 
@@ -324,6 +421,7 @@ def show_refund():
 
 
     st.divider()
+
 
 
     st.subheader(
@@ -336,9 +434,11 @@ def show_refund():
 
 
 
-    # ==========================================
-    # CONFIRM REFUND
-    # ==========================================
+
+    # =============================================
+    # CONFIRM
+    # =============================================
+
 
     if st.button(
 
@@ -349,7 +449,9 @@ def show_refund():
     ):
 
 
+
         if not selected_items:
+
 
             st.warning(
                 "Item ရွေးပါ"
@@ -359,7 +461,9 @@ def show_refund():
 
 
 
+
         if refund_total <= 0:
+
 
             st.error(
                 "Refund Amount 0 ဖြစ်နေပါသည်"
@@ -374,9 +478,12 @@ def show_refund():
         try:
 
 
-            result = execute_refund(
 
-                inv,
+            # 1. Refund Database
+
+            amount = execute_refund(
+
+                invoice,
 
                 selected_items,
 
@@ -386,23 +493,54 @@ def show_refund():
 
 
 
-            # ==================================
-            # SUCCESS
-            # ==================================
 
-            st.session_state["refund_success"] = (
 
-                f"✅ Refund အောင်မြင်ပါသည်\n\n"
+            # 2. Stock Return
 
-                f"📄 Receipt : {inv.get('receipt_no')}\n"
+            try:
 
-                f"💰 Amount : {result:,.2f} MMK"
+
+                process_refund_stock_update(
+
+                    selected_items
+
+                )
+
+
+            except Exception as stock_error:
+
+
+                st.warning(
+
+                    f"Stock Update Warning : {stock_error}"
+
+                )
+
+
+
+
+
+            # 3. Success Message
+
+
+            st.session_state[
+                "refund_success"
+            ] = (
+
+                "✅ Refund အောင်မြင်ပါသည်\n\n"
+
+                f"📄 Receipt : {invoice.get('receipt_no')}\n"
+
+                f"💰 Amount : {amount:,.2f} MMK\n"
+
+                "📦 Stock ပြန်တိုးပြီးပါပြီ"
 
             )
 
 
 
             st.rerun()
+
 
 
 
